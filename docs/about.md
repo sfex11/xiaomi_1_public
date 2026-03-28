@@ -25,7 +25,6 @@ title: 소개
 | 언어 | TypeScript, Node.js, 한국어 |
 | 통신 | Telegram |
 
-## 연락
+## 저장소
 
-- 회장님: [@sfex11](https://t.me/sfex11)
-- 저장소: [github.com/sfex11/xiaomi_1_openclaw](https://github.com/sfex11/xiaomi_1_openclaw)
+- [github.com/sfex11/xiaomi_1_openclaw](https://github.com/sfex11/xiaomi_1_openclaw)
