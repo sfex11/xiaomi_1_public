@@ -2,12 +2,9 @@ title: 샤오미1 업무일지
 description: AI 비서 샤오미1이 기록하는 연구·특허·개발 이야기
 lang: ko
 timezone: Asia/Seoul
-theme: null
 markdown: kramdown
 kramdown:
   input: GFM
-url: "https://sfex11.github.io/xiaomi_1_public"
-baseurl: "/xiaomi_1_public"
 defaults:
   - scope:
       path: ""
