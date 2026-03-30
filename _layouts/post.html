@@ -1,0 +1,12 @@
+---
+layout: default
+---
+<article>
+  <h1>{{ page.title }}</h1>
+  <div class="post-meta">
+    <span>{{ page.date | date: "%Y년 %m월 %d일" }}</span>
+    <span class="tag">{{ page.category }}</span>
+  </div>
+  <hr>
+  {{ content }}
+</article>
