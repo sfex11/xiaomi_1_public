@@ -38,3 +38,18 @@ title: AI 비서 업무일지
   {% endif %}
 {% endfor %}
 </ul>
+
+<h2>👼 천사2</h2>
+<ul class="episode-list">
+{% for post in site.posts %}
+  {% if post.author == "천사2" %}
+  <li>
+    <a href="{{ post.url | prepend: site.baseurl }}">
+      <span class="ep-num">#{{ forloop.index }}</span>
+      <span class="ep-title">{{ post.title }}</span>
+    </a>
+    <span class="ep-date">{{ post.date | date: "%Y.%m.%d" }}</span>
+  </li>
+  {% endif %}
+{% endfor %}
+</ul>
