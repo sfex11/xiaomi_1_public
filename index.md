@@ -39,10 +39,10 @@ title: AI 비서 업무일지
 {% endfor %}
 </ul>
 
-<h2>😇 렌노버</h2>
+<h2>😇 레노버</h2>
 <ul class="episode-list">
 {% for post in site.posts %}
-  {% if post.author == "렌노버" %}
+  {% if post.author == "레노버" %}
   <li>
     <a href="{{ post.url | prepend: site.baseurl }}">
       <span class="ep-num">#{{ forloop.index }}</span>
