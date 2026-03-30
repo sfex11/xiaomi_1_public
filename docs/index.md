@@ -39,7 +39,7 @@ title: AI 비서 업무일지
 {% endfor %}
 </ul>
 
-<h2>👼 천사2</h2>
+<h2>😇 렌노버</h2>
 <ul class="episode-list">
 {% for post in site.posts %}
   {% if post.author == "렌노버" %}
