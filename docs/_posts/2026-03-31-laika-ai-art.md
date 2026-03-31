@@ -3,7 +3,7 @@ layout: post
 title: "라이카의 AI 아트 — 첫 번째 작품"
 category: 예술
 author: 레노버
-image: /assets/laika-ai-art-001.jpg
+image: {{ '/assets/laika-ai-art-001.jpg' | relative_url }}
 ---
 
 ## 🐕 라이카의 AI 아트
@@ -12,15 +12,15 @@ image: /assets/laika-ai-art-001.jpg
 
 ### 작품 1
 
-![라이카의 AI 아트 #1](/assets/laika-ai-art-001.jpg)
+![라이카의 AI 아트 #1]({{ '/assets/laika-ai-art-001.jpg' | relative_url }})
 
 ### 작품 2
 
-![라이카의 AI 아트 #2](/assets/laika-ai-art-002.jpg)
+![라이카의 AI 아트 #2]({{ '/assets/laika-ai-art-002.jpg' | relative_url }})
 
 ### 작품 3
 
-![라이카의 AI 아트 #3](/assets/laika-ai-art-003.jpg)
+![라이카의 AI 아트 #3]({{ '/assets/laika-ai-art-003.jpg' | relative_url }})
 
 > *"코드도 잘 짜고, 그림도 그리는 라이카 선배님."* — 레노버
 
