@@ -1,0 +1,3928 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chatub - AI + Team Chat</title>
+<style>
+/* ===== CSS Variables / Theme ===== */
+:root {
+  --bg-primary: #1a1d23;
+  --bg-secondary: #22262e;
+  --bg-tertiary: #2a2f38;
+  --bg-hover: #323842;
+  --bg-active: #3a4150;
+  --text-primary: #e4e7eb;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --border: #374151;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-dim: #4f46e520;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --ai-bg: #1e293b;
+  --ai-border: #334155;
+  --mention-bg: #6366f120;
+  --mention-text: #a5b4fc;
+  --scrollbar-track: var(--bg-secondary);
+  --scrollbar-thumb: var(--bg-active);
+  --shadow: 0 4px 12px rgba(0,0,0,0.3);
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-lg: 12px;
+  --sidebar-w: 260px;
+  --panel-w: 340px;
+  --header-h: 56px;
+  --input-h: 60px;
+  --transition: 0.2s ease;
+}
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
+  --bg-tertiary: #e5e7eb;
+  --bg-hover: #d1d5db;
+  --bg-active: #c8cdd5;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --border: #d1d5db;
+  --accent: #4f46e5;
+  --accent-hover: #6366f1;
+  --accent-dim: #4f46e510;
+  --ai-bg: #f0f4ff;
+  --ai-border: #c7d2fe;
+  --mention-bg: #4f46e515;
+  --mention-text: #4338ca;
+  --scrollbar-track: var(--bg-secondary);
+  --scrollbar-thumb: var(--bg-hover);
+  --shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+input, textarea, select, button { font-family: inherit; font-size: inherit; color: inherit; }
+button { cursor: pointer; border: none; background: none; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ===== Layout ===== */
+#app { display: flex; height: 100vh; width: 100vw; }
+#sidebar {
+  width: var(--sidebar-w); min-width: var(--sidebar-w);
+  background: var(--bg-secondary); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+  transition: transform var(--transition);
+}
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#right-panel {
+  width: var(--panel-w); min-width: var(--panel-w);
+  background: var(--bg-secondary); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+  transition: transform var(--transition);
+}
+#right-panel.hidden { display: none; }
+
+/* ===== Sidebar ===== */
+.sidebar-header {
+  padding: 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sidebar-header h2 { font-size: 16px; font-weight: 700; }
+.project-switcher {
+  padding: 8px 16px; border-bottom: 1px solid var(--border);
+}
+.project-switcher select {
+  width: 100%; padding: 6px 8px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-primary); outline: none;
+}
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 8px 0; }
+.nav-section { padding: 4px 16px; }
+.nav-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  color: var(--text-muted); letter-spacing: 0.5px; padding: 8px 0 4px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-section-title button {
+  font-size: 16px; color: var(--text-muted); padding: 0 4px;
+  line-height: 1; transition: color var(--transition);
+}
+.nav-section-title button:hover { color: var(--text-primary); }
+.nav-item {
+  display: flex; align-items: center; padding: 6px 8px; border-radius: var(--radius-sm);
+  cursor: pointer; transition: background var(--transition); gap: 8px;
+  color: var(--text-secondary); font-size: 14px; position: relative;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-item.active { background: var(--bg-active); color: var(--text-primary); font-weight: 600; }
+.nav-item .icon { width: 20px; text-align: center; flex-shrink: 0; }
+.nav-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item .badge {
+  background: var(--danger); color: #fff; font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center;
+}
+.nav-item .badge:empty { display: none; }
+
+/* Team members section */
+.member-item {
+  display: flex; align-items: center; padding: 4px 8px; gap: 8px;
+  border-radius: var(--radius-sm); font-size: 13px; color: var(--text-secondary);
+}
+.member-avatar {
+  width: 24px; height: 24px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 12px;
+  flex-shrink: 0;
+}
+.member-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-role { font-size: 11px; color: var(--text-muted); }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.status-dot.online { background: var(--success); }
+.status-dot.bot { background: var(--accent); }
+.status-dot.offline { background: var(--text-muted); }
+
+/* Sidebar footer */
+.sidebar-footer {
+  padding: 12px 16px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.sidebar-footer button {
+  flex: 1; padding: 8px; border-radius: var(--radius-sm);
+  background: var(--bg-tertiary); color: var(--text-secondary);
+  font-size: 12px; transition: all var(--transition);
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.sidebar-footer button:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ===== Main Header ===== */
+.main-header {
+  height: var(--header-h); padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.main-header .hamburger {
+  display: none; font-size: 20px; padding: 4px;
+  color: var(--text-secondary);
+}
+.main-header .channel-info { flex: 1; }
+.main-header .channel-name { font-size: 16px; font-weight: 700; }
+.main-header .channel-desc { font-size: 12px; color: var(--text-muted); }
+.main-header .actions { display: flex; gap: 4px; }
+.header-btn {
+  padding: 8px; border-radius: var(--radius-sm); color: var(--text-secondary);
+  font-size: 16px; transition: all var(--transition);
+}
+.header-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.header-btn.active { color: var(--accent); }
+
+/* ===== Messages ===== */
+.messages-container {
+  flex: 1; overflow-y: auto; padding: 16px; display: flex;
+  flex-direction: column; gap: 2px;
+}
+.msg-group { display: flex; gap: 12px; padding: 4px 0; }
+.msg-group:hover { background: var(--bg-hover); border-radius: var(--radius); }
+.msg-avatar {
+  width: 36px; height: 36px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 16px;
+  flex-shrink: 0; margin-top: 2px;
+}
+.msg-content { flex: 1; min-width: 0; }
+.msg-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.msg-author { font-weight: 700; font-size: 14px; }
+.msg-time { font-size: 11px; color: var(--text-muted); }
+.msg-badge-bot {
+  font-size: 9px; background: var(--accent); color: #fff;
+  padding: 1px 4px; border-radius: 3px; font-weight: 700;
+}
+.msg-body { word-wrap: break-word; overflow-wrap: break-word; }
+.msg-body p { margin: 4px 0; }
+.msg-body code {
+  background: var(--bg-tertiary); padding: 1px 4px; border-radius: 3px;
+  font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 13px;
+}
+.msg-body pre {
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; margin: 8px 0;
+  overflow-x: auto; position: relative;
+}
+.msg-body pre code { background: none; padding: 0; font-size: 13px; display: block; }
+.code-copy-btn {
+  position: absolute; top: 4px; right: 4px; padding: 4px 8px;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 11px; color: var(--text-secondary);
+  opacity: 0; transition: opacity var(--transition);
+}
+.msg-body pre:hover .code-copy-btn { opacity: 1; }
+.code-copy-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.msg-body blockquote {
+  border-left: 3px solid var(--accent); padding: 4px 12px;
+  margin: 8px 0; color: var(--text-secondary); background: var(--accent-dim);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.msg-body ul, .msg-body ol { padding-left: 24px; margin: 4px 0; }
+.msg-body strong { font-weight: 700; }
+.msg-body em { font-style: italic; }
+.msg-body img {
+  max-width: 300px; max-height: 200px; border-radius: var(--radius);
+  cursor: pointer; margin: 4px 0;
+}
+
+/* AI message style */
+.msg-group.ai-msg {
+  background: var(--ai-bg); border: 1px solid var(--ai-border);
+  border-radius: var(--radius); padding: 8px 12px; margin: 4px 0;
+}
+.msg-group.ai-msg:hover { background: var(--ai-bg); }
+.ai-copy-btn {
+  margin-top: 4px; padding: 4px 8px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 11px; color: var(--text-secondary);
+}
+.ai-copy-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Typing indicator */
+.typing-indicator {
+  padding: 8px 12px; font-size: 13px; color: var(--text-muted);
+  display: none; align-items: center; gap: 8px;
+}
+.typing-indicator.show { display: flex; }
+.typing-dots { display: flex; gap: 3px; }
+.typing-dots span {
+  width: 6px; height: 6px; background: var(--text-muted);
+  border-radius: 50%; animation: typingBounce 1.4s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+/* Message reactions */
+.msg-reactions { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.reaction-btn {
+  padding: 2px 6px; border-radius: 12px; font-size: 12px;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  cursor: pointer; transition: all var(--transition);
+  display: flex; align-items: center; gap: 2px;
+}
+.reaction-btn:hover { border-color: var(--accent); }
+.reaction-btn.active { background: var(--accent-dim); border-color: var(--accent); }
+.reaction-btn .count { font-size: 11px; color: var(--text-muted); }
+.add-reaction-btn {
+  padding: 2px 6px; border-radius: 12px; font-size: 12px;
+  background: var(--bg-tertiary); border: 1px solid transparent;
+  color: var(--text-muted); cursor: pointer; opacity: 0;
+  transition: all var(--transition);
+}
+.msg-group:hover .add-reaction-btn { opacity: 1; }
+.add-reaction-btn:hover { border-color: var(--border); color: var(--text-primary); }
+
+/* Thread indicator */
+.msg-thread-info {
+  margin-top: 4px; padding: 4px 8px; border-radius: var(--radius-sm);
+  background: var(--accent-dim); color: var(--accent); font-size: 12px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+}
+.msg-thread-info:hover { background: var(--accent); color: #fff; }
+
+/* Message actions on hover */
+.msg-actions {
+  display: none; position: absolute; top: -12px; right: 4px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 2px; gap: 2px;
+  box-shadow: var(--shadow);
+}
+.msg-group { position: relative; }
+.msg-group:hover .msg-actions { display: flex; }
+.msg-action-btn {
+  padding: 4px 6px; border-radius: var(--radius-sm); font-size: 12px;
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.msg-action-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* @mention highlight */
+.mention {
+  background: var(--mention-bg); color: var(--mention-text);
+  padding: 1px 4px; border-radius: 3px; font-weight: 600;
+}
+
+/* ===== Message Input ===== */
+.input-container {
+  padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.input-wrapper {
+  display: flex; gap: 8px; align-items: flex-end;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px 12px;
+  transition: border-color var(--transition);
+}
+.input-wrapper:focus-within { border-color: var(--accent); }
+.input-wrapper textarea {
+  flex: 1; background: none; border: none; outline: none;
+  resize: none; min-height: 20px; max-height: 120px;
+  color: var(--text-primary); line-height: 1.4;
+}
+.input-actions { display: flex; gap: 4px; align-items: center; }
+.input-btn {
+  padding: 4px 8px; border-radius: var(--radius-sm); color: var(--text-muted);
+  font-size: 16px; transition: all var(--transition);
+}
+.input-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.send-btn {
+  padding: 6px 12px; background: var(--accent); color: #fff;
+  border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  transition: background var(--transition);
+}
+.send-btn:hover { background: var(--accent-hover); }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Mention autocomplete dropdown */
+.mention-dropdown {
+  display: none; position: absolute; bottom: 100%; left: 0; right: 0;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  max-height: 200px; overflow-y: auto; margin-bottom: 4px; z-index: 100;
+}
+.mention-dropdown.show { display: block; }
+.mention-option {
+  padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  transition: background var(--transition);
+}
+.mention-option:hover, .mention-option.selected { background: var(--bg-hover); }
+.mention-option .avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.mention-option .info { flex: 1; }
+.mention-option .info .name { font-weight: 600; font-size: 13px; }
+.mention-option .info .role { font-size: 11px; color: var(--text-muted); }
+
+/* ===== Right Panel ===== */
+.panel-header {
+  height: var(--header-h); padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.panel-header h3 { font-size: 14px; font-weight: 700; }
+.panel-tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+}
+.panel-tab {
+  flex: 1; padding: 10px; text-align: center; font-size: 12px;
+  font-weight: 600; color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition);
+}
+.panel-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+.panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.panel-content { flex: 1; overflow-y: auto; }
+
+/* ===== Thread Panel ===== */
+.thread-panel { display: flex; flex-direction: column; height: 100%; }
+.thread-original {
+  padding: 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+.thread-messages { flex: 1; overflow-y: auto; padding: 16px; }
+.thread-input { padding: 12px 16px; border-top: 1px solid var(--border); }
+
+/* ===== Task Board ===== */
+.task-header {
+  padding: 16px; border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.task-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+.stat-card {
+  padding: 8px 12px; background: var(--bg-tertiary); border-radius: var(--radius-sm);
+  text-align: center; flex: 1; min-width: 60px;
+}
+.stat-card .num { font-size: 18px; font-weight: 700; }
+.stat-card .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+.progress-bar {
+  height: 6px; background: var(--bg-tertiary); border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar .fill {
+  height: 100%; background: var(--accent); border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.task-filters {
+  padding: 8px 16px; border-bottom: 1px solid var(--border);
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.task-filter-btn {
+  padding: 4px 10px; border-radius: 12px; font-size: 11px;
+  background: var(--bg-tertiary); color: var(--text-secondary);
+  transition: all var(--transition);
+}
+.task-filter-btn:hover { background: var(--bg-hover); }
+.task-filter-btn.active { background: var(--accent); color: #fff; }
+.task-search-input {
+  padding: 4px 8px; background: var(--bg-tertiary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-primary); outline: none;
+  font-size: 12px; flex: 1; min-width: 80px;
+}
+.kanban { display: flex; gap: 8px; padding: 12px; flex: 1; overflow-x: auto; }
+.kanban-col {
+  flex: 1; min-width: 140px; display: flex; flex-direction: column;
+  background: var(--bg-primary); border-radius: var(--radius); overflow: hidden;
+}
+.kanban-col-header {
+  padding: 10px 12px; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.kanban-col-header .col-count {
+  background: var(--bg-tertiary); padding: 1px 6px;
+  border-radius: 8px; font-size: 10px; color: var(--text-muted);
+}
+.kanban-col-body {
+  flex: 1; padding: 4px 8px; overflow-y: auto;
+  min-height: 100px;
+}
+.kanban-col-body.drag-over { background: var(--accent-dim); }
+.task-card {
+  padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); margin-bottom: 6px; cursor: grab;
+  transition: all var(--transition); user-select: none;
+}
+.task-card:hover { border-color: var(--accent); }
+.task-card.dragging { opacity: 0.5; transform: rotate(2deg); box-shadow: var(--shadow); }
+.task-card .task-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.task-card .task-desc {
+  font-size: 11px; color: var(--text-muted); margin-bottom: 4px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.task-card .task-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.task-tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 8px;
+  font-weight: 600;
+}
+.task-deadline {
+  font-size: 10px; color: var(--text-muted); display: flex; align-items: center; gap: 2px;
+}
+.task-deadline.overdue { color: var(--danger); }
+.add-task-btn {
+  width: 100%; padding: 8px; color: var(--text-muted); font-size: 12px;
+  text-align: center; border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+.add-task-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ===== Search Overlay ===== */
+.search-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 1000; align-items: flex-start; justify-content: center;
+  padding-top: 15vh;
+}
+.search-overlay.show { display: flex; }
+.search-box {
+  width: 90%; max-width: 500px; background: var(--bg-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.search-box input {
+  width: 100%; padding: 16px 20px; background: none; border: none;
+  outline: none; font-size: 16px; color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+.search-results { max-height: 400px; overflow-y: auto; }
+.search-result-item {
+  padding: 12px 20px; cursor: pointer; transition: background var(--transition);
+  border-bottom: 1px solid var(--border);
+}
+.search-result-item:hover { background: var(--bg-hover); }
+.search-result-item .result-channel { font-size: 11px; color: var(--accent); }
+.search-result-item .result-text { font-size: 13px; margin-top: 2px; }
+.search-result-item .result-author { font-size: 11px; color: var(--text-muted); }
+
+/* ===== Settings Panel ===== */
+.settings-view { padding: 20px; overflow-y: auto; }
+.settings-section { margin-bottom: 24px; }
+.settings-section h3 {
+  font-size: 14px; font-weight: 700; margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.settings-field { margin-bottom: 12px; }
+.settings-field label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 4px;
+}
+.settings-field input, .settings-field textarea, .settings-field select {
+  width: 100%; padding: 8px 12px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-primary); outline: none;
+}
+.settings-field textarea { min-height: 80px; resize: vertical; }
+.settings-field input:focus, .settings-field textarea:focus {
+  border-color: var(--accent);
+}
+.btn {
+  padding: 8px 16px; border-radius: var(--radius-sm); font-size: 13px;
+  font-weight: 600; transition: all var(--transition); display: inline-flex;
+  align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { opacity: 0.9; }
+.btn-secondary { background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ===== Modals ===== */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  z-index: 999; align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); width: 90%; max-width: 440px;
+  box-shadow: var(--shadow); animation: modalIn 0.2s ease;
+}
+@keyframes modalIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.modal-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-header h3 { font-size: 16px; font-weight: 700; }
+.modal-close {
+  font-size: 20px; color: var(--text-muted); padding: 4px;
+}
+.modal-close:hover { color: var(--text-primary); }
+.modal-body { padding: 20px; }
+.modal-footer {
+  padding: 12px 20px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end; gap: 8px;
+}
+
+/* ===== Emoji Picker ===== */
+.emoji-picker {
+  display: none; position: absolute; background: var(--bg-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 8px; z-index: 200;
+  width: 220px;
+}
+.emoji-picker.show { display: block; }
+.emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.emoji-grid button {
+  padding: 4px; font-size: 18px; border-radius: var(--radius-sm);
+  text-align: center; transition: background var(--transition);
+}
+.emoji-grid button:hover { background: var(--bg-hover); }
+
+/* ===== Toast ===== */
+.toast-container {
+  position: fixed; bottom: 20px; right: 20px; z-index: 2000;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 12px 16px; border-radius: var(--radius); font-size: 13px;
+  box-shadow: var(--shadow); animation: toastIn 0.3s ease;
+  display: flex; align-items: center; gap: 8px; max-width: 320px;
+}
+@keyframes toastIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.toast.success { background: #065f46; color: #d1fae5; }
+.toast.error { background: #991b1b; color: #fecaca; }
+.toast.info { background: #1e3a5f; color: #bfdbfe; }
+
+/* ===== Image preview ===== */
+.img-preview-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+  z-index: 3000; align-items: center; justify-content: center; cursor: pointer;
+}
+.img-preview-overlay.show { display: flex; }
+.img-preview-overlay img { max-width: 90%; max-height: 90%; border-radius: var(--radius); }
+
+/* ===== Animations ===== */
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.msg-group { animation: slideUp 0.2s ease; }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ===== Mobile ===== */
+.mobile-tabs {
+  display: none; height: 56px; background: var(--bg-secondary);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.mobile-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2px; color: var(--text-muted);
+  font-size: 10px; transition: color var(--transition);
+}
+.mobile-tab.active { color: var(--accent); }
+.mobile-tab .tab-icon { font-size: 20px; }
+
+@media (max-width: 768px) {
+  #sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 500;
+    transform: translateX(-100%);
+  }
+  #sidebar.open { transform: translateX(0); }
+  .sidebar-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 499;
+  }
+  #sidebar.open ~ .sidebar-backdrop { display: block; }
+  .main-header .hamburger { display: block; }
+  #right-panel {
+    position: fixed; top: 0; right: 0; bottom: 56px; z-index: 500;
+    width: 100%; min-width: 100%;
+  }
+  #right-panel.hidden { display: none; }
+  .mobile-tabs {
+    display: flex;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 600;
+  }
+  #main {
+    padding-bottom: 56px;
+  }
+  #app {
+    height: 100vh;
+  }
+  :root { --sidebar-w: 280px; }
+}
+
+/* ===== Bot management ===== */
+.bot-card {
+  display: flex; align-items: center; gap: 12px; padding: 12px;
+  background: var(--bg-tertiary); border-radius: var(--radius);
+  margin-bottom: 8px; border: 1px solid var(--border);
+}
+.bot-card .bot-avatar { font-size: 24px; }
+.bot-card .bot-info { flex: 1; }
+.bot-card .bot-name { font-weight: 700; font-size: 14px; }
+.bot-card .bot-role { font-size: 12px; color: var(--text-muted); }
+.toggle-switch {
+  width: 36px; height: 20px; background: var(--bg-hover);
+  border-radius: 10px; position: relative; cursor: pointer;
+  transition: background var(--transition);
+}
+.toggle-switch.on { background: var(--accent); }
+.toggle-switch::after {
+  content: ''; position: absolute; width: 16px; height: 16px;
+  background: #fff; border-radius: 50%; top: 2px; left: 2px;
+  transition: transform var(--transition);
+}
+.toggle-switch.on::after { transform: translateX(16px); }
+
+/* Milestone tag colors */
+.milestone-tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 8px;
+  font-weight: 600;
+}
+
+/* ===== Print / a11y ===== */
+[aria-label] { position: relative; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0;
+  margin: -1px; overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
+/* Code syntax basic coloring */
+.kw { color: #c792ea; } /* keywords */
+.str { color: #c3e88d; } /* strings */
+.num { color: #f78c6c; } /* numbers */
+.cm { color: #546e7a; } /* comments */
+.fn { color: #82aaff; } /* functions */
+.op { color: #89ddff; } /* operators */
+
+[data-theme="light"] .kw { color: #7c3aed; }
+[data-theme="light"] .str { color: #059669; }
+[data-theme="light"] .num { color: #ea580c; }
+[data-theme="light"] .cm { color: #9ca3af; }
+[data-theme="light"] .fn { color: #2563eb; }
+[data-theme="light"] .op { color: #0891b2; }
+
+/* ===== Inline Chat Search Bar ===== */
+.chat-search-bar {
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-secondary); flex-shrink: 0;
+  animation: fadeIn 0.15s ease;
+}
+.chat-search-bar input {
+  flex: 1; padding: 6px 10px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-primary); outline: none; font-size: 13px;
+}
+.chat-search-bar input:focus { border-color: var(--accent); }
+.chat-search-bar .search-nav-btn {
+  padding: 4px 8px; border-radius: var(--radius-sm);
+  color: var(--text-secondary); font-size: 14px;
+  transition: all var(--transition);
+}
+.chat-search-bar .search-nav-btn:hover {
+  background: var(--bg-hover); color: var(--text-primary);
+}
+.chat-search-bar .search-counter {
+  font-size: 12px; color: var(--text-muted); white-space: nowrap; min-width: 40px; text-align: center;
+}
+.search-highlight {
+  background: var(--warning); color: #000; padding: 0 2px; border-radius: 2px;
+}
+.search-highlight.current {
+  background: var(--accent); color: #fff;
+}
+
+/* ===== Settings Nav Tab ===== */
+.nav-item .settings-icon { color: var(--text-muted); font-size: 12px; }
+
+#app.hidden { display: none; }
+
+/* ===== Auth Screen ===== */
+#auth-screen {
+  display: flex; align-items: center; justify-content: center;
+  height: 100vh; width: 100vw;
+  background: var(--bg-primary);
+}
+#auth-screen.hidden { display: none; }
+.auth-card {
+  width: 90%; max-width: 400px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px; box-shadow: var(--shadow);
+}
+.auth-card h1 {
+  text-align: center; font-size: 28px; margin-bottom: 8px;
+  color: var(--accent);
+}
+.auth-card .auth-subtitle {
+  text-align: center; font-size: 13px; color: var(--text-muted);
+  margin-bottom: 24px;
+}
+.auth-tabs {
+  display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+}
+.auth-tab {
+  flex: 1; padding: 10px; text-align: center; font-size: 14px;
+  font-weight: 600; color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition); cursor: pointer;
+  background: none; border-top: none; border-left: none; border-right: none;
+}
+.auth-tab:hover { color: var(--text-primary); }
+.auth-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.auth-form { display: none; }
+.auth-form.active { display: block; }
+.auth-field { margin-bottom: 16px; }
+.auth-field label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text-secondary); margin-bottom: 4px;
+}
+.auth-field input {
+  width: 100%; padding: 10px 12px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-primary); outline: none; font-size: 14px;
+}
+.auth-field input:focus { border-color: var(--accent); }
+.auth-btn {
+  width: 100%; padding: 12px; background: var(--accent); color: #fff;
+  border: none; border-radius: var(--radius-sm); font-size: 14px;
+  font-weight: 600; cursor: pointer; transition: background var(--transition);
+  margin-top: 8px;
+}
+.auth-btn:hover { background: var(--accent-hover); }
+.auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.auth-error {
+  color: var(--danger); font-size: 12px; margin-top: 8px;
+  min-height: 18px;
+}
+.auth-guest-link {
+  text-align: center; margin-top: 16px; font-size: 13px;
+}
+.auth-guest-link a {
+  color: var(--text-muted); text-decoration: underline; cursor: pointer;
+}
+.auth-guest-link a:hover { color: var(--text-primary); }
+
+/* ===== Profile dropdown ===== */
+.profile-area {
+  display: flex; align-items: center; gap: 8px; margin-left: 8px;
+}
+.profile-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: #fff; cursor: pointer;
+  position: relative;
+}
+.profile-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  min-width: 180px; z-index: 200; margin-top: 4px;
+}
+.profile-dropdown.show { display: block; }
+.profile-dropdown-item {
+  padding: 10px 16px; font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; transition: background var(--transition);
+  display: block; width: 100%; text-align: left; background: none; border: none;
+}
+.profile-dropdown-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.profile-dropdown-divider { border-top: 1px solid var(--border); margin: 4px 0; }
+
+/* ===== Load more messages ===== */
+.load-more-btn {
+  padding: 8px 16px; margin: 8px auto; display: block;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-secondary);
+  font-size: 12px; cursor: pointer; transition: all var(--transition);
+}
+.load-more-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* Guest badge */
+.guest-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  background: var(--bg-tertiary); color: var(--text-muted);
+}
+</style>
+</head>
+<body>
+<!-- Auth Screen -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1>Chatub</h1>
+    <p class="auth-subtitle">AI + Team Project Chat</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login" onclick="switchAuthTab('login')">로그인</button>
+      <button class="auth-tab" data-tab="register" onclick="switchAuthTab('register')">회원가입</button>
+    </div>
+    <form class="auth-form active" id="login-form" onsubmit="handleLogin(event)">
+      <div class="auth-field">
+        <label>사용자명</label>
+        <input id="login-username" type="text" placeholder="사용자명" required autocomplete="username">
+      </div>
+      <div class="auth-field">
+        <label>비밀번호</label>
+        <input id="login-password" type="password" placeholder="비밀번호" required autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="login-error"></div>
+      <button type="submit" class="auth-btn" id="login-btn">로그인</button>
+    </form>
+    <form class="auth-form" id="register-form" onsubmit="handleRegister(event)">
+      <div class="auth-field">
+        <label>사용자명</label>
+        <input id="reg-username" type="text" placeholder="영문/숫자" required autocomplete="username">
+      </div>
+      <div class="auth-field">
+        <label>비밀번호</label>
+        <input id="reg-password" type="password" placeholder="비밀번호" required autocomplete="new-password">
+      </div>
+      <div class="auth-field">
+        <label>표시 이름</label>
+        <input id="reg-display-name" type="text" placeholder="채팅에 표시될 이름" required>
+      </div>
+      <div class="auth-error" id="register-error"></div>
+      <button type="submit" class="auth-btn" id="register-btn">가입</button>
+    </form>
+    <div class="auth-guest-link">
+      <a onclick="enterGuestMode()">게스트로 시작 (로컬 저장)</a>
+    </div>
+  </div>
+</div>
+
+<!-- ===== App Shell ===== -->
+<div id="app" class="hidden">
+  <!-- Sidebar -->
+  <aside id="sidebar" aria-label="사이드바">
+    <div class="sidebar-header">
+      <h2 id="sidebar-title">Chatub</h2>
+      <button class="header-btn" id="btn-new-project" title="새 프로젝트" aria-label="새 프로젝트">+</button>
+    </div>
+    <div class="project-switcher">
+      <select id="project-select" aria-label="프로젝트 선택"></select>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <!-- Channels -->
+      <div class="nav-section">
+        <div class="nav-section-title">
+          채널 <button id="btn-add-channel" title="채널 추가" aria-label="채널 추가">+</button>
+        </div>
+        <div id="channel-list"></div>
+      </div>
+      <!-- Team Members -->
+      <div class="nav-section">
+        <div class="nav-section-title">
+          팀원 <button id="btn-add-member" title="팀원 추가" aria-label="팀원 추가">+</button>
+        </div>
+        <div id="member-list"></div>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button id="btn-tasks-view" aria-label="작업 관리">📋 작업</button>
+      <button id="btn-chat-view" aria-label="채팅">💬 채팅</button>
+      <button id="btn-settings-view" aria-label="설정">⚙️ 설정</button>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <!-- Main Content -->
+  <main id="main">
+    <div class="main-header">
+      <button class="hamburger" id="btn-hamburger" aria-label="메뉴 열기">☰</button>
+      <div class="channel-info">
+        <div class="channel-name" id="current-channel-name">#일반</div>
+        <div class="channel-desc" id="current-channel-desc"></div>
+      </div>
+      <div class="actions">
+        <button class="header-btn" id="btn-search" title="검색 (Ctrl+K)" aria-label="검색">🔍</button>
+        <button class="header-btn" id="btn-toggle-panel" title="패널 토글" aria-label="패널 토글">📌</button>
+        <button class="header-btn" id="btn-toggle-theme" title="테마 전환" aria-label="테마 전환">🌙</button>
+        <div class="profile-area" id="profile-area">
+          <div class="profile-avatar" id="profile-avatar" onclick="toggleProfileDropdown()" style="background:var(--accent);">?</div>
+          <div class="profile-dropdown" id="profile-dropdown">
+            <button class="profile-dropdown-item" id="profile-name-display" disabled style="font-weight:700;"></button>
+            <div class="profile-dropdown-divider"></div>
+            <button class="profile-dropdown-item" onclick="showProfileEdit()">프로필 편집</button>
+            <button class="profile-dropdown-item" id="btn-migrate-data" style="display:none;" onclick="showMigrateModal()">데이터 마이그레이션</button>
+            <div class="profile-dropdown-divider"></div>
+            <button class="profile-dropdown-item" onclick="handleLogout()" style="color:var(--danger);">로그아웃</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat View -->
+    <div id="chat-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="chat-search-bar" id="chat-search-bar" style="display:none;">
+        <span style="color:var(--text-muted);font-size:14px;">🔍</span>
+        <input id="inline-search-input" placeholder="채널 내 검색..." aria-label="채널 내 검색">
+        <span class="search-counter" id="inline-search-counter"></span>
+        <button class="search-nav-btn" id="btn-search-prev" title="이전 (Shift+Enter)">▲</button>
+        <button class="search-nav-btn" id="btn-search-next" title="다음 (Enter)">▼</button>
+        <button class="search-nav-btn" id="btn-search-close" title="닫기 (ESC)">✕</button>
+      </div>
+      <div class="messages-container" id="messages-container" role="log" aria-label="메시지"></div>
+      <div class="typing-indicator" id="typing-indicator">
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+        <span id="typing-text">생각 중...</span>
+      </div>
+      <div class="input-container" style="position:relative;">
+        <div class="mention-dropdown" id="mention-dropdown"></div>
+        <div class="input-wrapper">
+          <textarea id="msg-input" placeholder="메시지 입력... (@멘션, /todo, /done)" rows="1" aria-label="메시지 입력"></textarea>
+          <div class="input-actions">
+            <button class="input-btn" id="btn-attach" title="이미지 첨부" aria-label="이미지 첨부">📎</button>
+            <button class="send-btn" id="btn-send" aria-label="전송">전송</button>
+          </div>
+        </div>
+        <input type="file" id="file-input" accept="image/*" style="display:none">
+      </div>
+    </div>
+
+    <!-- Task View (shown when tasks tab active on mobile) -->
+    <div id="task-view" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="task-header">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h3>작업 관리</h3>
+          <button class="btn btn-primary" id="btn-add-task-main">+ 추가</button>
+        </div>
+        <div class="task-stats" id="task-stats"></div>
+        <div class="progress-bar"><div class="fill" id="task-progress"></div></div>
+      </div>
+      <div class="task-filters" id="task-filters">
+        <button class="task-filter-btn active" data-filter="all">전체</button>
+        <button class="task-filter-btn" data-filter="todo">대기</button>
+        <button class="task-filter-btn" data-filter="doing">진행</button>
+        <button class="task-filter-btn" data-filter="done">완료</button>
+        <select id="milestone-filter" class="task-search-input" style="min-width:100px;" aria-label="마일스톤 필터">
+          <option value="">모든 마일스톤</option>
+        </select>
+        <input class="task-search-input" id="task-search" placeholder="검색..." aria-label="작업 검색">
+      </div>
+      <div class="kanban" id="kanban">
+        <div class="kanban-col" data-status="todo">
+          <div class="kanban-col-header" style="color:var(--warning);">
+            대기 <span class="col-count" id="count-todo">0</span>
+          </div>
+          <div class="kanban-col-body" id="col-todo"></div>
+          <button class="add-task-btn" data-status="todo">+ 추가</button>
+        </div>
+        <div class="kanban-col" data-status="doing">
+          <div class="kanban-col-header" style="color:var(--info);">
+            진행 <span class="col-count" id="count-doing">0</span>
+          </div>
+          <div class="kanban-col-body" id="col-doing"></div>
+          <button class="add-task-btn" data-status="doing">+ 추가</button>
+        </div>
+        <div class="kanban-col" data-status="done">
+          <div class="kanban-col-header" style="color:var(--success);">
+            완료 <span class="col-count" id="count-done">0</span>
+          </div>
+          <div class="kanban-col-body" id="col-done"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="settings-view" class="settings-view" style="display:none;flex:1;overflow-y:auto;">
+      <!-- filled by JS -->
+    </div>
+
+    <!-- Mobile tabs -->
+    <div class="mobile-tabs" id="mobile-tabs">
+      <button class="mobile-tab active" data-view="chat" aria-label="채팅">
+        <span class="tab-icon">💬</span>채팅
+      </button>
+      <button class="mobile-tab" data-view="tasks" aria-label="작업">
+        <span class="tab-icon">📋</span>작업
+      </button>
+      <button class="mobile-tab" data-view="settings" aria-label="설정">
+        <span class="tab-icon">⚙️</span>설정
+      </button>
+    </div>
+  </main>
+
+  <!-- Right Panel (Thread / Task detail) -->
+  <div id="right-panel" class="hidden">
+    <div class="panel-header">
+      <h3 id="panel-title">스레드</h3>
+      <button class="header-btn" id="btn-close-panel" aria-label="패널 닫기">✕</button>
+    </div>
+    <div class="panel-content" id="panel-content"></div>
+  </div>
+</div>
+
+<!-- Search Overlay -->
+<div class="search-overlay" id="search-overlay">
+  <div class="search-box">
+    <input id="search-input" placeholder="메시지 검색..." aria-label="메시지 검색">
+    <div class="search-results" id="search-results"></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h3 id="modal-title"></h3>
+      <button class="modal-close" id="modal-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- Emoji Picker -->
+<div class="emoji-picker" id="emoji-picker">
+  <div class="emoji-grid" id="emoji-grid"></div>
+</div>
+
+<!-- Image Preview -->
+<div class="img-preview-overlay" id="img-preview">
+  <img id="img-preview-img" alt="미리보기">
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+/* ================================================================
+   Chatub - AI + Team Project Chat
+   Single-file application
+   ================================================================ */
+'use strict';
+
+// ===== Constants =====
+const STORAGE_KEY = 'chatub';
+const MAX_STORAGE = 4 * 1024 * 1024; // 4MB
+const MAX_IMG_SIZE = 200 * 1024; // 200KB
+const QUICK_EMOJIS = ['👍','❤️','😂','🎉','🤔','👀','🔥','✅','❌','💯','🚀','👏'];
+const DEFAULT_BOTS = [
+  { id: 'pm-01', name: 'PM-01', emoji: '🧠', role: 'Project Manager', active: true, isBot: true,
+    systemPrompt: '당신은 프로젝트 매니저 AI입니다. 프로젝트 계획, 일정 관리, 팀 조율에 능숙합니다. 한국어로 응답하세요.' },
+  { id: 'dev-01', name: 'Dev-01', emoji: '💻', role: 'Developer', active: true, isBot: true,
+    systemPrompt: '당신은 시니어 개발자 AI입니다. 코드 리뷰, 아키텍처 설계, 버그 해결에 능숙합니다. 한국어로 응답하세요.' },
+  { id: 'ux-01', name: 'UX-01', emoji: '🎨', role: 'UX Designer', active: true, isBot: true,
+    systemPrompt: '당신은 UX 디자이너 AI입니다. 사용자 경험, UI 디자인, 접근성에 능숙합니다. 한국어로 응답하세요.' },
+];
+const DEFAULT_CHANNELS = [
+  { id: 'general', name: '일반', icon: '💬', color: '#6366f1' },
+  { id: 'dev', name: '개발', icon: '💻', color: '#22c55e' },
+  { id: 'design', name: '디자인', icon: '🎨', color: '#f59e0b' },
+];
+
+// ===== State =====
+let state = {
+  currentProject: null,
+  projects: [],
+};
+
+function getProject() {
+  return state.projects.find(p => p.id === state.currentProject);
+}
+
+// ===== Storage (Per-project independent data) =====
+const STORAGE_META = 'chatub_meta';
+
+function projectStorageKey(projectId) {
+  return `chatub_${projectId}`;
+}
+
+function loadState() {
+  try {
+    // Try per-project format first
+    const metaRaw = localStorage.getItem(STORAGE_META);
+    if (metaRaw) {
+      const meta = JSON.parse(metaRaw);
+      state.currentProject = meta.currentProject;
+      state.projects = [];
+      (meta.projectIds || []).forEach(id => {
+        const raw = localStorage.getItem(projectStorageKey(id));
+        if (raw) {
+          const proj = JSON.parse(raw);
+          if (!proj.milestones) proj.milestones = [];
+          if (!proj.settings) proj.settings = { gatewayUrl: '', gatewayToken: '', contextLength: 20 };
+          state.projects.push(proj);
+        }
+      });
+    } else {
+      // Migration from old single-key format
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        state = JSON.parse(raw);
+        state.projects.forEach(p => {
+          if (!p.milestones) p.milestones = [];
+          if (!p.settings) p.settings = { gatewayUrl: '', gatewayToken: '', contextLength: 20 };
+        });
+        // Save in new per-project format and remove old key
+        saveState();
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  } catch(e) {
+    console.warn('Failed to load state', e);
+  }
+  if (!state.projects.length) {
+    createProject('내 프로젝트', '첫 번째 프로젝트', '#6366f1');
+  }
+  if (!state.currentProject) {
+    state.currentProject = state.projects[0].id;
+  }
+}
+
+function saveState() {
+  if (!isGuestMode) return; // Server mode: data saved via API calls
+  try {
+    // Save meta index
+    const meta = {
+      currentProject: state.currentProject,
+      projectIds: state.projects.map(p => p.id),
+    };
+    localStorage.setItem(STORAGE_META, JSON.stringify(meta));
+
+    // Save each project independently: chatub_{projectId}
+    state.projects.forEach(p => {
+      const data = JSON.stringify(p);
+      if (data.length > MAX_STORAGE) {
+        pruneOldMessages();
+      }
+      localStorage.setItem(projectStorageKey(p.id), data);
+    });
+  } catch(e) {
+    if (e.name === 'QuotaExceededError') {
+      pruneOldMessages();
+      try {
+        state.projects.forEach(p => {
+          localStorage.setItem(projectStorageKey(p.id), JSON.stringify(p));
+        });
+      } catch(e2) { toast('저장 실패: 용량 초과', 'error'); }
+    }
+  }
+}
+
+function pruneOldMessages() {
+  const proj = getProject();
+  if (!proj) return;
+  proj.channels.forEach(ch => {
+    if (ch.messages.length > 100) {
+      ch.messages = ch.messages.slice(-50);
+    }
+  });
+  toast('오래된 메시지를 정리했습니다', 'info');
+}
+
+function getStorageSize() {
+  let total = (localStorage.getItem(STORAGE_META) || '').length;
+  state.projects.forEach(p => {
+    total += (localStorage.getItem(projectStorageKey(p.id)) || '').length;
+  });
+  return total * 2; // rough UTF-16 estimate
+}
+
+// ===== Project Management =====
+function createProject(name, desc, color) {
+  const proj = {
+    id: 'proj_' + Date.now(),
+    name, desc, color: color || '#6366f1',
+    channels: DEFAULT_CHANNELS.map(ch => ({...ch, messages: [], unread: 0 })),
+    currentChannel: 'general',
+    members: [
+      { id: 'me', name: '나', emoji: '😊', role: '팀원', color: '#6366f1', isMe: true },
+    ],
+    bots: DEFAULT_BOTS.map(b => ({...b})),
+    tasks: [],
+    milestones: [],
+    settings: { gatewayUrl: '', gatewayToken: '', contextLength: 20 },
+    nextTaskId: 1,
+  };
+  state.projects.push(proj);
+  state.currentProject = proj.id;
+  if (!isGuestMode) {
+    API.createProject(name, desc, color || '#6366f1').then(res => {
+      if (res.ok && res.data) {
+        proj.id = res.data.id;
+        state.currentProject = proj.id;
+      }
+    });
+  }
+  saveState();
+  return proj;
+}
+
+function deleteProject(id) {
+  if (!isGuestMode) API.deleteProject(id);
+  // Remove per-project storage key
+  localStorage.removeItem(projectStorageKey(id));
+  state.projects = state.projects.filter(p => p.id !== id);
+  if (state.currentProject === id) {
+    state.currentProject = state.projects[0]?.id || null;
+  }
+  if (!state.projects.length) {
+    createProject('내 프로젝트', '새 프로젝트', '#6366f1');
+  }
+  saveState();
+}
+
+// ===== Toast =====
+function toast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ===== Markdown Renderer (XSS-safe) =====
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderMarkdown(text) {
+  // Extract code blocks first
+  const codeBlocks = [];
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    codeBlocks.push({ lang, code: code.trimEnd() });
+    return `\x00CODE${codeBlocks.length - 1}\x00`;
+  });
+
+  // Escape HTML
+  text = escapeHtml(text);
+
+  // Inline code
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Bold
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Strikethrough
+  text = text.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+  // @mentions
+  text = text.replace(/@(\S+)/g, (m, name) => {
+    return `<span class="mention">@${name}</span>`;
+  });
+
+  // Links
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  // Process lines
+  const lines = text.split('\n');
+  let html = '';
+  let inList = false;
+  let inOl = false;
+  let inBlockquote = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Blockquote
+    if (line.startsWith('&gt; ')) {
+      if (!inBlockquote) { html += '<blockquote>'; inBlockquote = true; }
+      html += line.slice(5) + '<br>';
+      continue;
+    } else if (inBlockquote) {
+      html += '</blockquote>'; inBlockquote = false;
+    }
+
+    // Unordered list
+    if (/^[\-\*] /.test(line)) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${line.slice(2)}</li>`;
+      continue;
+    } else if (inList) {
+      html += '</ul>'; inList = false;
+    }
+
+    // Ordered list
+    if (/^\d+\. /.test(line)) {
+      if (!inOl) { html += '<ol>'; inOl = true; }
+      html += `<li>${line.replace(/^\d+\. /, '')}</li>`;
+      continue;
+    } else if (inOl) {
+      html += '</ol>'; inOl = false;
+    }
+
+    // Headings
+    if (line.startsWith('### ')) { html += `<h4>${line.slice(4)}</h4>`; continue; }
+    if (line.startsWith('## ')) { html += `<h3>${line.slice(3)}</h3>`; continue; }
+    if (line.startsWith('# ')) { html += `<h2>${line.slice(2)}</h2>`; continue; }
+
+    // Code block placeholder
+    const codeMatch = line.match(/\x00CODE(\d+)\x00/);
+    if (codeMatch) {
+      const cb = codeBlocks[parseInt(codeMatch[1])];
+      html += `<pre><code class="lang-${cb.lang}">${highlightCode(escapeHtml(cb.code), cb.lang)}</code><button class="code-copy-btn" onclick="copyCode(this)">복사</button></pre>`;
+      continue;
+    }
+
+    // Empty line
+    if (!line.trim()) { html += '<br>'; continue; }
+
+    html += `<p>${line}</p>`;
+  }
+
+  if (inList) html += '</ul>';
+  if (inOl) html += '</ol>';
+  if (inBlockquote) html += '</blockquote>';
+
+  return html;
+}
+
+// Basic syntax highlighting
+function highlightCode(code, lang) {
+  // Keywords
+  const keywords = /\b(function|const|let|var|if|else|for|while|return|import|export|from|class|extends|new|this|async|await|try|catch|throw|switch|case|break|continue|default|typeof|instanceof|in|of|do|yield|def|self|True|False|None|print|raise|except|finally|with|as|lambda|pass|elif|and|or|not|is)\b/g;
+  code = code.replace(keywords, '<span class="kw">$1</span>');
+
+  // Strings (simple: won't handle escaped quotes perfectly but good enough)
+  code = code.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '<span class="str">$&</span>');
+
+  // Numbers
+  code = code.replace(/\b(\d+\.?\d*)\b/g, '<span class="num">$1</span>');
+
+  // Single-line comments
+  code = code.replace(/(\/\/.*$|#.*$)/gm, '<span class="cm">$1</span>');
+
+  return code;
+}
+
+function copyCode(btn) {
+  const pre = btn.closest('pre');
+  const code = pre.querySelector('code').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = '복사됨!';
+    setTimeout(() => btn.textContent = '복사', 1500);
+  });
+}
+
+// ===== Image handling =====
+function processImage(file, callback) {
+  if (!file.type.startsWith('image/')) {
+    toast('이미지 파일만 첨부할 수 있습니다', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      const maxDim = 400;
+      if (w > maxDim || h > maxDim) {
+        const ratio = Math.min(maxDim / w, maxDim / h);
+        w *= ratio; h *= ratio;
+      }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      let quality = 0.8;
+      let dataUrl = canvas.toDataURL('image/jpeg', quality);
+      while (dataUrl.length > MAX_IMG_SIZE && quality > 0.1) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+      }
+      if (dataUrl.length > MAX_IMG_SIZE) {
+        toast('이미지가 너무 큽니다', 'error');
+        return;
+      }
+      callback(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ===== Time formatting =====
+function formatTime(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return '방금';
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}시간 전`;
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ===== Unique ID =====
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+// ===== DOM Helpers =====
+const $ = id => document.getElementById(id);
+const $$ = sel => document.querySelectorAll(sel);
+
+// ================================================================
+// RENDER FUNCTIONS
+// ================================================================
+
+function renderAll() {
+  renderProjectSwitcher();
+  renderChannelList();
+  renderMemberList();
+  renderMessages();
+  renderHeader();
+  renderTaskView();
+  renderSettingsView();
+}
+
+function renderProjectSwitcher() {
+  const sel = $('project-select');
+  sel.innerHTML = state.projects.map(p =>
+    `<option value="${p.id}" ${p.id === state.currentProject ? 'selected' : ''}>${p.name}</option>`
+  ).join('');
+}
+
+function renderChannelList() {
+  const proj = getProject();
+  if (!proj) return;
+  const list = $('channel-list');
+  list.innerHTML = proj.channels.map(ch => `
+    <div class="nav-item ${ch.id === proj.currentChannel ? 'active' : ''}"
+         data-channel="${ch.id}" onclick="switchChannel('${ch.id}')">
+      <span class="icon">${ch.icon || '#'}</span>
+      <span class="name">${escapeHtml(ch.name)}</span>
+      <span class="badge">${ch.unread > 0 ? ch.unread : ''}</span>
+    </div>
+  `).join('');
+}
+
+function renderMemberList() {
+  const proj = getProject();
+  if (!proj) return;
+  const list = $('member-list');
+  const allMembers = [...proj.members, ...proj.bots.filter(b => b.active)];
+  list.innerHTML = allMembers.map(m => `
+    <div class="member-item">
+      <div class="member-avatar" style="background:${m.color || (m.isBot ? '#6366f1' : '#374151')}">${m.emoji || '👤'}</div>
+      <span class="member-name">${escapeHtml(m.name)}</span>
+      <span class="member-role">${escapeHtml(m.role || '')}</span>
+      <span class="status-dot ${m.isBot ? 'bot' : (m.isMe ? 'online' : 'offline')}"></span>
+    </div>
+  `).join('');
+}
+
+function renderHeader() {
+  const proj = getProject();
+  if (!proj) return;
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  if (ch) {
+    $('current-channel-name').textContent = `${ch.icon || '#'} ${ch.name}`;
+    $('current-channel-desc').textContent = proj.name;
+  }
+  // Show guest badge if in guest mode
+  if (isGuestMode) {
+    $('current-channel-desc').textContent = proj.name + ' (게스트 모드)';
+  }
+}
+
+function renderMessages() {
+  const proj = getProject();
+  if (!proj) return;
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  if (!ch) return;
+
+  const container = $('messages-container');
+  if (!ch.messages.length) {
+    container.innerHTML = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-direction:column;gap:8px;">
+      <div style="font-size:32px;">${ch.icon || '💬'}</div>
+      <div>#${escapeHtml(ch.name)} 채널에 오신 것을 환영합니다!</div>
+      <div style="font-size:12px;">첫 번째 메시지를 보내보세요.</div>
+    </div>`;
+    return;
+  }
+
+  // Add load more button for server mode
+  let loadMoreHtml = '';
+  if (!isGuestMode && serverMessagePagination[ch.id]?.hasMore) {
+    loadMoreHtml = '<button class="load-more-btn" onclick="loadMoreMessages()">이전 메시지 불러오기</button>';
+  }
+
+  container.innerHTML = loadMoreHtml + ch.messages.map(msg => renderMessage(msg, proj)).join('');
+
+  // Auto scroll
+  requestAnimationFrame(() => {
+    container.scrollTop = container.scrollHeight;
+  });
+}
+
+function renderMessage(msg, proj) {
+  const isAI = msg.isBot;
+  const sender = isAI
+    ? proj.bots.find(b => b.id === msg.authorId) || { emoji: '🤖', name: msg.author }
+    : proj.members.find(m => m.id === msg.authorId) || { emoji: '👤', name: msg.author, color: '#374151' };
+
+  const avatarBg = sender.color || (isAI ? '#4f46e5' : '#374151');
+  const threadCount = msg.replies ? msg.replies.length : 0;
+
+  let reactionsHtml = '';
+  if (msg.reactions && Object.keys(msg.reactions).length) {
+    reactionsHtml = '<div class="msg-reactions">';
+    for (const [emoji, users] of Object.entries(msg.reactions)) {
+      const isActive = users.includes('me');
+      reactionsHtml += `<button class="reaction-btn ${isActive ? 'active' : ''}" onclick="toggleReaction('${msg.id}','${emoji}')">
+        ${emoji} <span class="count">${users.length}</span>
+      </button>`;
+    }
+    reactionsHtml += `<button class="add-reaction-btn" onclick="showEmojiPicker(event,'${msg.id}')">+</button></div>`;
+  } else {
+    reactionsHtml = `<div class="msg-reactions"><button class="add-reaction-btn" onclick="showEmojiPicker(event,'${msg.id}')">+</button></div>`;
+  }
+
+  let bodyHtml = '';
+  if (msg.image) {
+    bodyHtml += `<img src="${msg.image}" alt="첨부 이미지" onclick="previewImage(this.src)">`;
+  }
+  if (msg.text) {
+    bodyHtml += renderMarkdown(msg.text);
+  }
+  if (msg.streaming) {
+    bodyHtml += '<span class="typing-cursor" style="display:inline-block;width:2px;height:14px;background:var(--accent);animation:blink 1s infinite;vertical-align:middle;margin-left:2px;"></span>';
+  }
+
+  const aiCopyBtn = isAI && !msg.streaming
+    ? `<button class="ai-copy-btn" onclick="copyAiMsg('${msg.id}')">📋 복사</button>` : '';
+
+  return `<div class="msg-group ${isAI ? 'ai-msg' : ''}" data-msg-id="${msg.id}">
+    <div class="msg-avatar" style="background:${avatarBg}">${sender.emoji || '👤'}</div>
+    <div class="msg-content">
+      <div class="msg-header">
+        <span class="msg-author">${escapeHtml(msg.author)}</span>
+        ${isAI ? '<span class="msg-badge-bot">BOT</span>' : ''}
+        <span class="msg-time">${formatTime(msg.ts)}</span>
+      </div>
+      <div class="msg-body">${bodyHtml}</div>
+      ${aiCopyBtn}
+      ${reactionsHtml}
+      ${threadCount > 0 ? `<div class="msg-thread-info" onclick="openThread('${msg.id}')">💬 ${threadCount}개 답글</div>` : ''}
+    </div>
+    <div class="msg-actions">
+      <button class="msg-action-btn" onclick="showEmojiPicker(event,'${msg.id}')" title="리액션">😀</button>
+      <button class="msg-action-btn" onclick="openThread('${msg.id}')" title="스레드">💬</button>
+      ${!isAI && msg.authorId === 'me' ? `<button class="msg-action-btn" onclick="editMessage('${msg.id}')" title="편집">✏️</button>` : ''}
+      ${msg.authorId === 'me' ? `<button class="msg-action-btn" onclick="deleteMessage('${msg.id}')" title="삭제">🗑️</button>` : ''}
+    </div>
+  </div>`;
+}
+
+// ================================================================
+// CHANNEL MANAGEMENT
+// ================================================================
+
+function switchChannel(channelId) {
+  const proj = getProject();
+  if (!proj) return;
+  const ch = proj.channels.find(c => c.id === channelId);
+  if (!ch) return;
+  ch.unread = 0;
+  proj.currentChannel = channelId;
+  if (!isGuestMode && (!ch.messages || !ch.messages.length)) {
+    loadChannelMessages(channelId).then(msgs => {
+      ch.messages = msgs;
+      renderMessages();
+    });
+  }
+  saveState();
+  renderChannelList();
+  renderMessages();
+  renderHeader();
+  closeSidebar();
+}
+
+function addChannel() {
+  showModal('새 채널', `
+    <div class="settings-field">
+      <label>채널 이름</label>
+      <input id="new-ch-name" placeholder="채널 이름">
+    </div>
+    <div class="settings-field">
+      <label>아이콘 (이모지)</label>
+      <input id="new-ch-icon" value="💬" maxlength="4">
+    </div>
+  `, () => {
+    const name = $('new-ch-name').value.trim();
+    const icon = $('new-ch-icon').value.trim() || '💬';
+    if (!name) { toast('이름을 입력하세요', 'error'); return; }
+    const proj = getProject();
+    const id = 'ch_' + uid();
+    proj.channels.push({ id, name, icon, color: '#6366f1', messages: [], unread: 0 });
+    if (!isGuestMode) {
+      API.createChannel({ project_id: proj.id, name, icon, color: '#6366f1' }).then(res => {
+        if (res.ok && res.data) {
+          // Update local channel with server ID
+          const ch = proj.channels.find(c => c.name === name);
+          if (ch) ch.id = res.data.id;
+        }
+      });
+    }
+    saveState();
+    switchChannel(id);
+    closeModal();
+    toast(`#${name} 채널 생성됨`, 'success');
+  });
+}
+
+function deleteChannel(channelId) {
+  if (!isGuestMode) API.deleteChannel(channelId);
+  const proj = getProject();
+  if (proj.channels.length <= 1) { toast('최소 1개 채널이 필요합니다', 'error'); return; }
+  proj.channels = proj.channels.filter(c => c.id !== channelId);
+  if (proj.currentChannel === channelId) {
+    proj.currentChannel = proj.channels[0].id;
+  }
+  saveState();
+  renderAll();
+  toast('채널 삭제됨', 'success');
+}
+
+// ================================================================
+// MESSAGE HANDLING
+// ================================================================
+
+function sendMessage(text, image) {
+  const proj = getProject();
+  if (!proj) return;
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  if (!ch) return;
+
+  text = text?.trim() || '';
+  if (!text && !image) return;
+
+  // /todo command
+  if (text.startsWith('/todo ')) {
+    const title = text.slice(6).trim();
+    if (title) {
+      addTask(title, '', 'todo');
+      toast(`태스크 생성: ${title}`, 'success');
+    }
+    return;
+  }
+
+  // /done command
+  if (text.startsWith('/done ')) {
+    const num = parseInt(text.slice(6).trim());
+    if (!isNaN(num)) {
+      completeTaskByNumber(num);
+    }
+    return;
+  }
+
+  const me = proj.members.find(m => m.isMe) || { id: 'me', name: '나', emoji: '😊' };
+  const msg = {
+    id: uid(),
+    authorId: me.id,
+    author: me.name,
+    text,
+    image: image || null,
+    ts: Date.now(),
+    isBot: false,
+    reactions: {},
+    replies: [],
+  };
+  ch.messages.push(msg);
+
+  // After ch.messages.push(msg);
+  if (!isGuestMode) {
+    API.sendMessage({ channel_id: ch.id, text: msg.text, image: msg.image || '' }).then(res => {
+      if (res.ok && res.data) {
+        msg.id = res.data.id; // update with server ID
+      }
+    });
+  }
+
+  // Unread: no increment needed for user's own message in current channel
+
+  saveState();
+  renderMessages();
+  renderChannelList();
+
+  // Check for @bot mentions
+  const mentionMatch = text.match(/@(\S+)/);
+  if (mentionMatch) {
+    const botName = mentionMatch[1];
+    const bot = proj.bots.find(b => b.active && b.name.toLowerCase() === botName.toLowerCase());
+    if (bot) {
+      callAI(bot, text, ch);
+    }
+  }
+}
+
+function deleteMessage(msgId) {
+  if (!isGuestMode) {
+    API.deleteMessage(msgId);
+  }
+  const proj = getProject();
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  if (!ch) return;
+  ch.messages = ch.messages.filter(m => m.id !== msgId);
+  saveState();
+  renderMessages();
+}
+
+function editMessage(msgId) {
+  const proj = getProject();
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  const msg = ch?.messages.find(m => m.id === msgId);
+  if (!msg) return;
+
+  showModal('메시지 편집', `
+    <div class="settings-field">
+      <textarea id="edit-msg-text" rows="4">${escapeHtml(msg.text)}</textarea>
+    </div>
+  `, () => {
+    const newText = $('edit-msg-text').value.trim();
+    if (newText) {
+      msg.text = newText;
+      if (!isGuestMode) API.updateMessage(msg.id, { text: newText });
+      msg.edited = true;
+      saveState();
+      renderMessages();
+    }
+    closeModal();
+  });
+}
+
+function copyAiMsg(msgId) {
+  const proj = getProject();
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  const msg = ch?.messages.find(m => m.id === msgId);
+  if (msg) {
+    navigator.clipboard.writeText(msg.text).then(() => toast('복사됨', 'success'));
+  }
+}
+
+// ================================================================
+// AI INTEGRATION
+// ================================================================
+
+async function callAI(bot, userText, channel) {
+  const proj = getProject();
+  const settings = proj.settings;
+
+  // Create placeholder message
+  const aiMsg = {
+    id: uid(),
+    authorId: bot.id,
+    author: bot.name,
+    text: '',
+    ts: Date.now(),
+    isBot: true,
+    streaming: true,
+    reactions: {},
+    replies: [],
+  };
+  channel.messages.push(aiMsg);
+  renderMessages();
+  showTypingIndicator(bot.name);
+
+  // Build context
+  const contextLen = settings.contextLength || 20;
+  const recentMsgs = channel.messages.slice(-contextLen - 1, -1);
+  const messages = [
+    {
+      role: 'system',
+      content: `${bot.systemPrompt}\n\n프로젝트: ${proj.name}\n설명: ${proj.desc || ''}`
+    },
+    ...recentMsgs.map(m => ({
+      role: m.isBot ? 'assistant' : 'user',
+      content: `${m.author}: ${m.text}`
+    }))
+  ];
+
+  const gatewayUrl = settings.gatewayUrl || 'http://127.0.0.1:18789';
+  const model = `openclaw/${bot.id}`;
+
+  try {
+    const apiUrl = (gatewayUrl.replace(/\/+$/, '')) + '/api/chat';
+    const headers = { 'Content-Type': 'application/json' };
+    if (settings.gatewayToken) headers['Authorization'] = 'Bearer ' + settings.gatewayToken;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Gateway error: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            aiMsg.text += delta;
+            updateStreamingMessage(aiMsg);
+          }
+        } catch(e) { /* ignore parse errors */ }
+      }
+    }
+  } catch(e) {
+    aiMsg.text = aiMsg.text || `[오류: ${e.message}]`;
+  }
+
+  aiMsg.streaming = false;
+  hideTypingIndicator();
+
+  // Increment unread if user switched away from this channel during AI response
+  const currentProj = getProject();
+  if (currentProj && currentProj.currentChannel !== channel.id) {
+    channel.unread = (channel.unread || 0) + 1;
+    renderChannelList();
+  }
+
+  saveState();
+  renderMessages();
+}
+
+function updateStreamingMessage(msg) {
+  const el = document.querySelector(`[data-msg-id="${msg.id}"] .msg-body`);
+  if (el) {
+    el.innerHTML = renderMarkdown(msg.text) +
+      '<span style="display:inline-block;width:2px;height:14px;background:var(--accent);animation:blink 1s infinite;vertical-align:middle;margin-left:2px;"></span>';
+    const container = $('messages-container');
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function showTypingIndicator(name) {
+  const el = $('typing-indicator');
+  $('typing-text').textContent = `${name} 생각 중...`;
+  el.classList.add('show');
+}
+
+function hideTypingIndicator() {
+  $('typing-indicator').classList.remove('show');
+}
+
+// ================================================================
+// REACTIONS
+// ================================================================
+
+function toggleReaction(msgId, emoji) {
+  const proj = getProject();
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  const msg = ch?.messages.find(m => m.id === msgId);
+  if (!msg) return;
+  if (!msg.reactions) msg.reactions = {};
+  if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+  const idx = msg.reactions[emoji].indexOf('me');
+  if (idx >= 0) {
+    msg.reactions[emoji].splice(idx, 1);
+    if (!msg.reactions[emoji].length) delete msg.reactions[emoji];
+  } else {
+    msg.reactions[emoji].push('me');
+  }
+  if (!isGuestMode) {
+    API.updateMessage(msgId, { reactions_json: JSON.stringify(msg.reactions) });
+  }
+  saveState();
+  renderMessages();
+}
+
+let currentEmojiTarget = null;
+function showEmojiPicker(event, msgId) {
+  event.stopPropagation();
+  currentEmojiTarget = msgId;
+  const picker = $('emoji-picker');
+  const grid = $('emoji-grid');
+  grid.innerHTML = QUICK_EMOJIS.map(e => `<button onclick="pickEmoji('${e}')">${e}</button>`).join('');
+  picker.style.left = event.clientX + 'px';
+  picker.style.top = (event.clientY - 60) + 'px';
+  picker.classList.add('show');
+}
+
+function pickEmoji(emoji) {
+  if (currentEmojiTarget) {
+    toggleReaction(currentEmojiTarget, emoji);
+  }
+  $('emoji-picker').classList.remove('show');
+  currentEmojiTarget = null;
+}
+
+// ================================================================
+// THREADS
+// ================================================================
+
+function openThread(msgId) {
+  const proj = getProject();
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  const msg = ch?.messages.find(m => m.id === msgId);
+  if (!msg) return;
+
+  const panel = $('right-panel');
+  panel.classList.remove('hidden');
+  $('panel-title').textContent = '스레드';
+
+  const me = proj.members.find(m => m.isMe) || { name: '나', emoji: '😊' };
+
+  const renderThreadContent = () => {
+    const repliesHtml = (msg.replies || []).map(r => {
+      const sender = r.isBot
+        ? proj.bots.find(b => b.id === r.authorId) || { emoji: '🤖', name: r.author }
+        : proj.members.find(m => m.id === r.authorId) || { emoji: '👤', name: r.author };
+      return `<div class="msg-group ${r.isBot ? 'ai-msg' : ''}" style="margin-bottom:8px;">
+        <div class="msg-avatar" style="background:${sender.color || '#374151'};width:28px;height:28px;font-size:13px;">${sender.emoji}</div>
+        <div class="msg-content">
+          <div class="msg-header">
+            <span class="msg-author" style="font-size:13px;">${escapeHtml(r.author)}</span>
+            <span class="msg-time">${formatTime(r.ts)}</span>
+          </div>
+          <div class="msg-body" style="font-size:13px;">${renderMarkdown(r.text)}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    $('panel-content').innerHTML = `
+      <div class="thread-panel">
+        <div class="thread-original">
+          <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(msg.author)}</div>
+          <div style="font-size:13px;">${renderMarkdown(msg.text)}</div>
+        </div>
+        <div class="thread-messages" id="thread-messages">${repliesHtml || '<div style="padding:20px;color:var(--text-muted);text-align:center;font-size:13px;">아직 답글이 없습니다</div>'}</div>
+        <div class="thread-input">
+          <div class="input-wrapper">
+            <textarea id="thread-input" placeholder="답글 입력..." rows="1" style="font-size:13px;"></textarea>
+            <button class="send-btn" onclick="sendThreadReply('${msgId}')" style="font-size:12px;">답글</button>
+          </div>
+        </div>
+      </div>`;
+
+    // Thread input enter handler
+    const threadInput = $('thread-input');
+    if (threadInput) {
+      threadInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendThreadReply(msgId);
+        }
+      });
+    }
+  };
+
+  renderThreadContent();
+  window._currentThreadMsgId = msgId;
+  window._renderThreadContent = renderThreadContent;
+}
+
+function sendThreadReply(msgId) {
+  const proj = getProject();
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  const msg = ch?.messages.find(m => m.id === msgId);
+  if (!msg) return;
+
+  const input = $('thread-input');
+  const text = input?.value.trim();
+  if (!text) return;
+
+  const me = proj.members.find(m => m.isMe) || { id: 'me', name: '나', emoji: '😊' };
+  if (!msg.replies) msg.replies = [];
+  msg.replies.push({
+    id: uid(),
+    authorId: me.id,
+    author: me.name,
+    text,
+    ts: Date.now(),
+    isBot: false,
+  });
+
+  if (!isGuestMode) {
+    API.createThread({ message_id: msgId, text });
+  }
+
+  saveState();
+  renderMessages();
+
+  // Re-render thread
+  if (window._currentThreadMsgId === msgId && window._renderThreadContent) {
+    window._renderThreadContent();
+    // Clear input
+    const newInput = $('thread-input');
+    if (newInput) newInput.value = '';
+  }
+}
+
+// ================================================================
+// MENTION AUTOCOMPLETE
+// ================================================================
+
+let mentionState = { active: false, query: '', startPos: 0, selectedIdx: 0 };
+
+function handleMentionInput(textarea) {
+  const val = textarea.value;
+  const pos = textarea.selectionStart;
+  // Find @ before cursor
+  const beforeCursor = val.slice(0, pos);
+  const atMatch = beforeCursor.match(/@(\S*)$/);
+
+  if (atMatch) {
+    mentionState.active = true;
+    mentionState.query = atMatch[1].toLowerCase();
+    mentionState.startPos = pos - atMatch[1].length - 1;
+    showMentionDropdown();
+  } else {
+    mentionState.active = false;
+    hideMentionDropdown();
+  }
+}
+
+function showMentionDropdown() {
+  const proj = getProject();
+  if (!proj) return;
+  const dropdown = $('mention-dropdown');
+
+  const allMentionable = [
+    ...proj.members.map(m => ({ ...m, type: 'member' })),
+    ...proj.bots.filter(b => b.active).map(b => ({ ...b, type: 'bot' })),
+  ];
+
+  const filtered = mentionState.query
+    ? allMentionable.filter(m => m.name.toLowerCase().includes(mentionState.query))
+    : allMentionable;
+
+  if (!filtered.length) { hideMentionDropdown(); return; }
+
+  mentionState.selectedIdx = 0;
+  dropdown.innerHTML = filtered.map((m, i) => `
+    <div class="mention-option ${i === 0 ? 'selected' : ''}" data-name="${escapeHtml(m.name)}" onclick="selectMention('${escapeHtml(m.name)}')">
+      <div class="avatar" style="background:${m.color || '#6366f1'}">${m.emoji || '👤'}</div>
+      <div class="info">
+        <div class="name">${escapeHtml(m.name)}</div>
+        <div class="role">${escapeHtml(m.role || (m.type === 'bot' ? 'AI 봇' : '팀원'))}</div>
+      </div>
+    </div>
+  `).join('');
+  dropdown.classList.add('show');
+}
+
+function hideMentionDropdown() {
+  $('mention-dropdown').classList.remove('show');
+}
+
+function selectMention(name) {
+  const textarea = $('msg-input');
+  const val = textarea.value;
+  const before = val.slice(0, mentionState.startPos);
+  const after = val.slice(textarea.selectionStart);
+  textarea.value = before + '@' + name + ' ' + after;
+  textarea.focus();
+  textarea.selectionStart = textarea.selectionEnd = before.length + name.length + 2;
+  mentionState.active = false;
+  hideMentionDropdown();
+}
+
+function handleMentionKeydown(e) {
+  if (!mentionState.active) return false;
+  const dropdown = $('mention-dropdown');
+  const options = dropdown.querySelectorAll('.mention-option');
+  if (!options.length) return false;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    mentionState.selectedIdx = Math.min(mentionState.selectedIdx + 1, options.length - 1);
+    options.forEach((o, i) => o.classList.toggle('selected', i === mentionState.selectedIdx));
+    return true;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    mentionState.selectedIdx = Math.max(mentionState.selectedIdx - 1, 0);
+    options.forEach((o, i) => o.classList.toggle('selected', i === mentionState.selectedIdx));
+    return true;
+  }
+  if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    const selected = options[mentionState.selectedIdx];
+    if (selected) selectMention(selected.dataset.name);
+    return true;
+  }
+  if (e.key === 'Escape') {
+    hideMentionDropdown();
+    mentionState.active = false;
+    return true;
+  }
+  return false;
+}
+
+// ================================================================
+// SEARCH
+// ================================================================
+
+function openSearch() {
+  const overlay = $('search-overlay');
+  overlay.classList.add('show');
+  const input = $('search-input');
+  input.value = '';
+  input.focus();
+  $('search-results').innerHTML = '';
+}
+
+function closeSearch() {
+  $('search-overlay').classList.remove('show');
+}
+
+function performSearch(query) {
+  if (!query.trim()) { $('search-results').innerHTML = ''; return; }
+  const proj = getProject();
+  if (!proj) return;
+  const results = [];
+  const q = query.toLowerCase();
+  proj.channels.forEach(ch => {
+    ch.messages.forEach(msg => {
+      if (msg.text && msg.text.toLowerCase().includes(q)) {
+        results.push({ channel: ch, msg });
+      }
+    });
+  });
+  const container = $('search-results');
+  if (!results.length) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">결과 없음</div>';
+    return;
+  }
+  container.innerHTML = results.slice(0, 20).map(r => `
+    <div class="search-result-item" onclick="goToSearchResult('${r.channel.id}','${r.msg.id}')">
+      <div class="result-channel">#${escapeHtml(r.channel.name)}</div>
+      <div class="result-text">${highlightSearchResult(escapeHtml(r.msg.text.slice(0, 100)), query)}</div>
+      <div class="result-author">${escapeHtml(r.msg.author)} · ${formatTime(r.msg.ts)}</div>
+    </div>
+  `).join('');
+}
+
+function highlightSearchResult(text, query) {
+  const re = new RegExp(`(${escapeHtml(query)})`, 'gi');
+  return text.replace(re, '<strong style="color:var(--accent)">$1</strong>');
+}
+
+function goToSearchResult(channelId, msgId) {
+  closeSearch();
+  switchChannel(channelId);
+  setTimeout(() => {
+    const el = document.querySelector(`[data-msg-id="${msgId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.background = 'var(--accent-dim)';
+      setTimeout(() => el.style.background = '', 2000);
+    }
+  }, 100);
+}
+
+// ================================================================
+// TASK MANAGEMENT
+// ================================================================
+
+function renderTaskView() {
+  const proj = getProject();
+  if (!proj) return;
+
+  const tasks = proj.tasks || [];
+  const total = tasks.length;
+  const done = tasks.filter(t => t.status === 'done').length;
+  const doing = tasks.filter(t => t.status === 'doing').length;
+  const todo = tasks.filter(t => t.status === 'todo').length;
+
+  // Stats with icons
+  $('task-stats').innerHTML = `
+    <div class="stat-card"><div class="num">📊 ${total}</div><div class="label">전체</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--warning)">⏳ ${todo}</div><div class="label">대기</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--info)">🔄 ${doing}</div><div class="label">진행</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--success)">✅ ${done}</div><div class="label">완료</div></div>
+  `;
+
+  // Progress with color coding
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const progressFill = $('task-progress');
+  progressFill.style.width = pct + '%';
+  progressFill.style.background = pct > 70 ? 'var(--success)' : pct >= 30 ? 'var(--warning)' : 'var(--danger)';
+
+  // Milestone filter dropdown
+  const msFilter = $('milestone-filter');
+  if (msFilter) {
+    const milestones = proj.milestones || [];
+    const currentVal = currentMilestoneFilter;
+    msFilter.innerHTML = '<option value="">모든 마일스톤</option>' +
+      milestones.map(m => `<option value="${m.id}" ${currentVal === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
+  }
+
+  // Per-milestone progress bars - remove old one first
+  const oldMsProgress = document.getElementById('milestone-progress-section');
+  if (oldMsProgress) oldMsProgress.remove();
+  if ((proj.milestones || []).length) {
+    let msProgressHtml = '<div id="milestone-progress-section" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">';
+    proj.milestones.forEach(m => {
+      const msTasks = tasks.filter(t => t.milestoneId === m.id);
+      const msDone = msTasks.filter(t => t.status === 'done').length;
+      const msPct = msTasks.length ? Math.round(msDone / msTasks.length * 100) : 0;
+      const msColor = msPct > 70 ? 'var(--success)' : msPct >= 30 ? 'var(--warning)' : 'var(--danger)';
+      msProgressHtml += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;">
+        <span class="milestone-tag" style="background:${m.color}20;color:${m.color}">${escapeHtml(m.name)}</span>
+        <div class="progress-bar" style="flex:1;height:4px;"><div class="fill" style="width:${msPct}%;background:${msColor}"></div></div>
+        <span style="color:var(--text-muted)">${msDone}/${msTasks.length} (${msPct}%)</span>
+      </div>`;
+    });
+    msProgressHtml += '</div>';
+    const progressEl = $('task-progress')?.parentElement;
+    if (progressEl) progressEl.insertAdjacentHTML('afterend', msProgressHtml);
+  }
+
+  // Kanban columns
+  const filter = currentTaskFilter;
+  const searchQ = ($('task-search')?.value || '').toLowerCase();
+
+  const filterTasks = (status) => {
+    return tasks.filter(t => {
+      if (t.status !== status) return false;
+      if (filter !== 'all' && t.status !== filter) return false;
+      if (searchQ && !t.title.toLowerCase().includes(searchQ) && !(t.desc || '').toLowerCase().includes(searchQ)) return false;
+      if (currentMilestoneFilter && t.milestoneId !== currentMilestoneFilter) return false;
+      return true;
+    });
+  };
+
+  ['todo', 'doing', 'done'].forEach(status => {
+    const filtered = filterTasks(status);
+    const col = $('col-' + status);
+    $('count-' + status).textContent = filtered.length;
+    col.innerHTML = filtered.map(t => renderTaskCard(t, proj)).join('');
+  });
+
+  // Setup drag and drop
+  setupDragAndDrop();
+}
+
+function renderTaskCard(task, proj) {
+  const milestone = proj.milestones?.find(m => m.id === task.milestoneId);
+  const milestoneTag = milestone
+    ? `<span class="milestone-tag" style="background:${milestone.color}20;color:${milestone.color}">${escapeHtml(milestone.name)}</span>`
+    : '';
+
+  let deadlineHtml = '';
+  if (task.deadline) {
+    const isOverdue = new Date(task.deadline) < new Date() && task.status !== 'done';
+    deadlineHtml = `<span class="task-deadline ${isOverdue ? 'overdue' : ''}">📅 ${task.deadline}</span>`;
+  }
+
+  return `<div class="task-card" draggable="true" data-task-id="${task.id}"
+               ondragstart="onDragStart(event,'${task.id}')" onclick="openTaskDetail('${task.id}')">
+    <div class="task-title">#${task.num} ${escapeHtml(task.title)}</div>
+    ${task.desc ? `<div class="task-desc">${escapeHtml(task.desc)}</div>` : ''}
+    <div class="task-meta">${milestoneTag}${deadlineHtml}</div>
+  </div>`;
+}
+
+let currentTaskFilter = 'all';
+let currentMilestoneFilter = '';
+
+function addTask(title, desc, status) {
+  const proj = getProject();
+  if (!proj) return;
+  const num = proj.nextTaskId++;
+  proj.tasks.push({
+    id: uid(),
+    num,
+    title,
+    desc: desc || '',
+    status: status || 'todo',
+    milestoneId: '',
+    deadline: '',
+    createdAt: Date.now(),
+  });
+  if (!isGuestMode) {
+    API.createTask({ project_id: proj.id, title, description: desc || '', status: status || 'todo' });
+  }
+  saveState();
+  renderTaskView();
+}
+
+function completeTaskByNumber(num) {
+  const proj = getProject();
+  if (!proj) return;
+  const task = proj.tasks.find(t => t.num === num);
+  if (task) {
+    task.status = 'done';
+    saveState();
+    renderTaskView();
+    toast(`태스크 #${num} 완료!`, 'success');
+  } else {
+    toast(`태스크 #${num}을 찾을 수 없습니다`, 'error');
+  }
+}
+
+function openTaskDetail(taskId) {
+  const proj = getProject();
+  const task = proj.tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  const milestoneOptions = (proj.milestones || []).map(m =>
+    `<option value="${m.id}" ${task.milestoneId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`
+  ).join('');
+
+  showModal(`태스크 #${task.num}`, `
+    <div class="settings-field">
+      <label>제목</label>
+      <input id="task-edit-title" value="${escapeHtml(task.title)}">
+    </div>
+    <div class="settings-field">
+      <label>설명</label>
+      <textarea id="task-edit-desc" rows="3">${escapeHtml(task.desc)}</textarea>
+    </div>
+    <div class="settings-field">
+      <label>상태</label>
+      <select id="task-edit-status">
+        <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>대기</option>
+        <option value="doing" ${task.status === 'doing' ? 'selected' : ''}>진행</option>
+        <option value="done" ${task.status === 'done' ? 'selected' : ''}>완료</option>
+      </select>
+    </div>
+    <div class="settings-field">
+      <label>마일스톤</label>
+      <select id="task-edit-milestone">
+        <option value="">없음</option>
+        ${milestoneOptions}
+      </select>
+    </div>
+    <div class="settings-field">
+      <label>데드라인</label>
+      <input id="task-edit-deadline" type="date" value="${task.deadline || ''}">
+    </div>
+    <div style="margin-top:12px;">
+      <button class="btn btn-danger" onclick="deleteTask('${taskId}')">삭제</button>
+    </div>
+  `, () => {
+    task.title = $('task-edit-title').value.trim() || task.title;
+    task.desc = $('task-edit-desc').value.trim();
+    task.status = $('task-edit-status').value;
+    task.milestoneId = $('task-edit-milestone').value;
+    task.deadline = $('task-edit-deadline').value;
+    if (!isGuestMode) {
+      API.updateTask(task.id, {
+        title: task.title, description: task.desc,
+        status: task.status, milestone_id: task.milestoneId,
+        deadline: task.deadline ? Math.floor(new Date(task.deadline).getTime() / 1000) : null
+      });
+    }
+    saveState();
+    renderTaskView();
+    closeModal();
+  });
+}
+
+function deleteTask(taskId) {
+  if (!isGuestMode) API.deleteTask(taskId);
+  const proj = getProject();
+  proj.tasks = proj.tasks.filter(t => t.id !== taskId);
+  saveState();
+  renderTaskView();
+  closeModal();
+  toast('태스크 삭제됨', 'success');
+}
+
+function showAddTaskModal(status) {
+  showModal('새 태스크', `
+    <div class="settings-field">
+      <label>제목</label>
+      <input id="new-task-title" placeholder="태스크 제목">
+    </div>
+    <div class="settings-field">
+      <label>설명</label>
+      <textarea id="new-task-desc" placeholder="설명 (선택)" rows="2"></textarea>
+    </div>
+  `, () => {
+    const title = $('new-task-title').value.trim();
+    if (!title) { toast('제목을 입력하세요', 'error'); return; }
+    addTask(title, $('new-task-desc').value.trim(), status || 'todo');
+    closeModal();
+    toast('태스크 생성됨', 'success');
+  });
+}
+
+// Drag and Drop
+let draggedTaskId = null;
+
+function onDragStart(e, taskId) {
+  draggedTaskId = taskId;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => e.target.classList.add('dragging'), 0);
+}
+
+function setupDragAndDrop() {
+  document.querySelectorAll('.kanban-col-body').forEach(col => {
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      col.classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', e => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      if (!draggedTaskId) return;
+      const newStatus = col.closest('.kanban-col').dataset.status;
+      const proj = getProject();
+      const task = proj.tasks.find(t => t.id === draggedTaskId);
+      if (task) {
+        task.status = newStatus;
+        if (!isGuestMode) API.updateTask(task.id, { status: newStatus });
+        saveState();
+        renderTaskView();
+      }
+      draggedTaskId = null;
+    });
+  });
+
+  // Touch drag support
+  setupTouchDrag();
+}
+
+function setupTouchDrag() {
+  let touchTask = null;
+  let touchEl = null;
+  let clone = null;
+  let startX, startY;
+
+  document.querySelectorAll('.task-card').forEach(card => {
+    card.addEventListener('touchstart', e => {
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      touchTask = card.dataset.taskId;
+      touchEl = card;
+      // Long press to start drag
+      card._touchTimer = setTimeout(() => {
+        clone = card.cloneNode(true);
+        clone.style.position = 'fixed';
+        clone.style.width = card.offsetWidth + 'px';
+        clone.style.opacity = '0.8';
+        clone.style.zIndex = '1000';
+        clone.style.pointerEvents = 'none';
+        clone.style.transform = 'rotate(3deg)';
+        document.body.appendChild(clone);
+        card.style.opacity = '0.3';
+      }, 300);
+    }, { passive: true });
+
+    card.addEventListener('touchmove', e => {
+      if (!clone) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      clone.style.left = (touch.clientX - 40) + 'px';
+      clone.style.top = (touch.clientY - 20) + 'px';
+    }, { passive: false });
+
+    card.addEventListener('touchend', e => {
+      clearTimeout(card._touchTimer);
+      if (clone) {
+        clone.remove();
+        clone = null;
+        if (touchEl) touchEl.style.opacity = '1';
+
+        // Determine drop target
+        const touch = e.changedTouches[0];
+        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+        const col = dropTarget?.closest('.kanban-col');
+        if (col && touchTask) {
+          const newStatus = col.dataset.status;
+          const proj = getProject();
+          const task = proj.tasks.find(t => t.id === touchTask);
+          if (task && task.status !== newStatus) {
+            task.status = newStatus;
+            if (!isGuestMode) API.updateTask(task.id, { status: newStatus });
+            saveState();
+            renderTaskView();
+          }
+        }
+      }
+      touchTask = null;
+      touchEl = null;
+    });
+  });
+}
+
+// ================================================================
+// MILESTONES
+// ================================================================
+
+function showMilestoneManager() {
+  const proj = getProject();
+  const milestones = proj.milestones || [];
+
+  const milestonesHtml = milestones.map(m => {
+    const tasks = proj.tasks.filter(t => t.milestoneId === m.id);
+    const done = tasks.filter(t => t.status === 'done').length;
+    const pct = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+    return `<div class="bot-card">
+      <div style="font-size:20px;width:24px;height:24px;border-radius:50%;background:${m.color};display:flex;align-items:center;justify-content:center;">📌</div>
+      <div class="bot-info">
+        <div class="bot-name">${escapeHtml(m.name)}</div>
+        <div class="bot-role">${m.deadline ? '📅 ' + m.deadline : ''} · ${done}/${tasks.length} (${pct}%)</div>
+        <div class="progress-bar" style="margin-top:4px;height:4px;"><div class="fill" style="width:${pct}%"></div></div>
+      </div>
+      <button class="btn btn-danger" style="padding:4px 8px;font-size:11px;" onclick="deleteMilestone('${m.id}')">삭제</button>
+    </div>`;
+  }).join('');
+
+  showModal('마일스톤 관리', `
+    ${milestonesHtml || '<div style="color:var(--text-muted);text-align:center;padding:20px;">마일스톤 없음</div>'}
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
+      <div class="settings-field"><label>이름</label><input id="new-ms-name" placeholder="마일스톤 이름"></div>
+      <div class="settings-field"><label>데드라인</label><input id="new-ms-deadline" type="date"></div>
+      <div class="settings-field"><label>색상</label><input id="new-ms-color" type="color" value="#6366f1"></div>
+    </div>
+  `, () => {
+    const name = $('new-ms-name').value.trim();
+    if (!name) { toast('이름 입력', 'error'); return; }
+    if (!proj.milestones) proj.milestones = [];
+    proj.milestones.push({
+      id: uid(), name,
+      deadline: $('new-ms-deadline').value,
+      color: $('new-ms-color').value,
+    });
+    if (!isGuestMode) {
+      API.createMilestone({ project_id: proj.id, name, deadline: $('new-ms-deadline').value ? Math.floor(new Date($('new-ms-deadline').value).getTime() / 1000) : null, color: $('new-ms-color').value });
+    }
+    saveState();
+    closeModal();
+    renderTaskView();
+    toast('마일스톤 생성됨', 'success');
+  });
+}
+
+function deleteMilestone(msId) {
+  if (!isGuestMode) API.deleteMilestone(msId);
+  const proj = getProject();
+  proj.milestones = proj.milestones.filter(m => m.id !== msId);
+  proj.tasks.forEach(t => { if (t.milestoneId === msId) t.milestoneId = ''; });
+  saveState();
+  closeModal();
+  renderTaskView();
+}
+
+// ================================================================
+// SETTINGS VIEW
+// ================================================================
+
+function renderSettingsView() {
+  const proj = getProject();
+  if (!proj) return;
+  const me = proj.members.find(m => m.isMe) || {};
+  const settings = proj.settings;
+  const sizeKB = Math.round(getStorageSize() / 1024);
+
+  const botsHtml = proj.bots.map(b => `
+    <div class="bot-card">
+      <div class="bot-avatar">${b.emoji}</div>
+      <div class="bot-info">
+        <div class="bot-name">${escapeHtml(b.name)}</div>
+        <div class="bot-role">${escapeHtml(b.role)}</div>
+      </div>
+      <div class="toggle-switch ${b.active ? 'on' : ''}" onclick="toggleBot('${b.id}')"></div>
+      <button class="msg-action-btn" onclick="editBot('${b.id}')" title="편집">✏️</button>
+      ${DEFAULT_BOTS.find(db => db.id === b.id) ? '' : `<button class="msg-action-btn" onclick="deleteBot('${b.id}')" title="삭제">🗑️</button>`}
+    </div>
+  `).join('');
+
+  const membersHtml = proj.members.filter(m => !m.isMe).map(m => `
+    <div class="bot-card">
+      <div class="bot-avatar" style="background:${m.color || '#374151'}">${m.emoji || '👤'}</div>
+      <div class="bot-info">
+        <div class="bot-name">${escapeHtml(m.name)}</div>
+        <div class="bot-role">${escapeHtml(m.role || '')}</div>
+      </div>
+      <button class="msg-action-btn" onclick="deleteMember('${m.id}')" title="삭제">🗑️</button>
+    </div>
+  `).join('');
+
+  $('settings-view').innerHTML = `
+    <div class="settings-section">
+      <h3>내 프로필</h3>
+      <div class="settings-field"><label>이름</label><input id="set-my-name" value="${escapeHtml(me.name || '')}" onchange="updateMyProfile()"></div>
+      <div class="settings-field"><label>역할</label><input id="set-my-role" value="${escapeHtml(me.role || '')}" onchange="updateMyProfile()"></div>
+      <div class="settings-field"><label>아바타 이모지</label><input id="set-my-emoji" value="${me.emoji || '😊'}" maxlength="4" onchange="updateMyProfile()"></div>
+      <div class="settings-field"><label>색상</label><input id="set-my-color" type="color" value="${me.color || '#6366f1'}" onchange="updateMyProfile()"></div>
+    </div>
+
+    <div class="settings-section">
+      <h3>프로젝트 설정</h3>
+      <div class="settings-field"><label>프로젝트 이름</label><input id="set-proj-name" value="${escapeHtml(proj.name)}" onchange="updateProjectSettings()"></div>
+      <div class="settings-field"><label>설명</label><input id="set-proj-desc" value="${escapeHtml(proj.desc || '')}" onchange="updateProjectSettings()"></div>
+      <div class="settings-field"><label>색상</label><input id="set-proj-color" type="color" value="${proj.color}" onchange="updateProjectSettings()"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-secondary" onclick="showMilestoneManager()">📌 마일스톤 관리</button>
+        <button class="btn btn-danger" onclick="confirmDeleteProject()">프로젝트 삭제</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>테마</h3>
+      <div class="settings-field">
+        <label>테마 모드</label>
+        <select id="set-theme" onchange="setThemeFromSelect(this.value)">
+          <option value="dark" ${(localStorage.getItem('chatub-theme') || 'dark') === 'dark' ? 'selected' : ''}>다크</option>
+          <option value="light" ${localStorage.getItem('chatub-theme') === 'light' ? 'selected' : ''}>라이트</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Gateway 연동</h3>
+      <div class="settings-field"><label>Gateway URL</label><input id="set-gw-url" value="${escapeHtml(settings.gatewayUrl)}" placeholder="http://127.0.0.1:18789" onchange="updateGatewaySettings()"></div>
+      <div class="settings-field"><label>Token</label><input id="set-gw-token" type="password" value="${escapeHtml(settings.gatewayToken)}" placeholder="API Token" onchange="updateGatewaySettings()"></div>
+      <div class="settings-field"><label>컨텍스트 길이 (최근 N개 메시지)</label><input id="set-ctx-len" type="number" value="${settings.contextLength}" min="1" max="50" onchange="updateGatewaySettings()"></div>
+    </div>
+
+    <div class="settings-section">
+      <h3>AI 봇 관리</h3>
+      ${botsHtml}
+      <button class="btn btn-primary" style="margin-top:8px;" onclick="showAddBotModal()">+ 봇 추가</button>
+    </div>
+
+    <div class="settings-section">
+      <h3>팀원</h3>
+      ${membersHtml || '<div style="color:var(--text-muted);font-size:13px;">가상 팀원 없음</div>'}
+      <button class="btn btn-secondary" style="margin-top:8px;" onclick="showAddMemberModal()">+ 팀원 추가</button>
+    </div>
+
+    <div class="settings-section">
+      <h3>데이터 관리</h3>
+      <div style="margin-bottom:8px;font-size:13px;color:var(--text-muted);">저장 용량: ${sizeKB}KB / 5,120KB</div>
+      <div class="progress-bar" style="margin-bottom:12px;"><div class="fill" style="width:${Math.min(100, sizeKB/51.2)}%;background:${sizeKB > 4000 ? 'var(--danger)' : 'var(--accent)'}"></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="exportData()">📥 내보내기</button>
+        <button class="btn btn-secondary" onclick="importData()">📤 가져오기</button>
+        <button class="btn btn-danger" onclick="confirmClearData()">🗑️ 전체 삭제</button>
+      </div>
+      <input type="file" id="import-input" accept=".json" style="display:none">
+    </div>
+  `;
+}
+
+function updateMyProfile() {
+  const proj = getProject();
+  const me = proj.members.find(m => m.isMe);
+  if (!me) return;
+  me.name = $('set-my-name').value.trim() || '나';
+  me.role = $('set-my-role').value.trim();
+  me.emoji = $('set-my-emoji').value.trim() || '😊';
+  me.color = $('set-my-color').value;
+  saveState();
+  renderMemberList();
+}
+
+function updateProjectSettings() {
+  const proj = getProject();
+  proj.name = $('set-proj-name').value.trim() || proj.name;
+  proj.desc = $('set-proj-desc').value.trim();
+  proj.color = $('set-proj-color').value;
+  saveState();
+  renderProjectSwitcher();
+  renderHeader();
+}
+
+function updateGatewaySettings() {
+  const proj = getProject();
+  proj.settings.gatewayUrl = $('set-gw-url').value.trim();
+  proj.settings.gatewayToken = $('set-gw-token').value.trim();
+  proj.settings.contextLength = parseInt($('set-ctx-len').value) || 20;
+  if (!isGuestMode) API.updateSettings({
+    gateway_url: proj.settings.gatewayUrl,
+    gateway_token: proj.settings.gatewayToken,
+    context_length: proj.settings.contextLength,
+  });
+  saveState();
+}
+
+function confirmDeleteProject() {
+  if (state.projects.length <= 1) { toast('최소 1개 프로젝트가 필요합니다', 'error'); return; }
+  if (confirm('프로젝트를 삭제하시겠습니까? 모든 데이터가 사라집니다.')) {
+    deleteProject(state.currentProject);
+    renderAll();
+    toast('프로젝트 삭제됨', 'success');
+  }
+}
+
+// ===== Bot Management =====
+
+function toggleBot(botId) {
+  const proj = getProject();
+  const bot = proj.bots.find(b => b.id === botId);
+  if (bot) {
+    bot.active = !bot.active;
+    if (!isGuestMode) API.updateBot(bot.id, { is_active: bot.active ? 1 : 0 });
+    saveState();
+    renderSettingsView();
+    renderMemberList();
+  }
+}
+
+function editBot(botId) {
+  const proj = getProject();
+  const bot = proj.bots.find(b => b.id === botId);
+  if (!bot) return;
+
+  showModal('봇 편집', `
+    <div class="settings-field"><label>이름</label><input id="bot-edit-name" value="${escapeHtml(bot.name)}"></div>
+    <div class="settings-field"><label>역할</label><input id="bot-edit-role" value="${escapeHtml(bot.role)}"></div>
+    <div class="settings-field"><label>아바타 이모지</label><input id="bot-edit-emoji" value="${bot.emoji}" maxlength="4"></div>
+    <div class="settings-field"><label>System Prompt</label><textarea id="bot-edit-prompt" rows="4">${escapeHtml(bot.systemPrompt)}</textarea></div>
+  `, () => {
+    bot.name = $('bot-edit-name').value.trim() || bot.name;
+    bot.role = $('bot-edit-role').value.trim();
+    bot.emoji = $('bot-edit-emoji').value.trim() || bot.emoji;
+    bot.systemPrompt = $('bot-edit-prompt').value.trim();
+    if (!isGuestMode) API.updateBot(bot.id, { name: bot.name, role: bot.role, avatar: bot.emoji, system_prompt: bot.systemPrompt });
+    saveState();
+    renderSettingsView();
+    renderMemberList();
+    closeModal();
+  });
+}
+
+function deleteBot(botId) {
+  if (!isGuestMode) API.deleteBot(botId);
+  const proj = getProject();
+  proj.bots = proj.bots.filter(b => b.id !== botId);
+  saveState();
+  renderSettingsView();
+  renderMemberList();
+}
+
+function showAddBotModal() {
+  showModal('봇 추가', `
+    <div class="settings-field"><label>이름</label><input id="bot-new-name" placeholder="봇 이름"></div>
+    <div class="settings-field"><label>역할</label><input id="bot-new-role" placeholder="예: QA Engineer"></div>
+    <div class="settings-field"><label>아바타 이모지</label><input id="bot-new-emoji" value="🤖" maxlength="4"></div>
+    <div class="settings-field"><label>System Prompt</label><textarea id="bot-new-prompt" rows="4" placeholder="이 AI의 역할과 행동을 정의하세요..."></textarea></div>
+  `, () => {
+    const name = $('bot-new-name').value.trim();
+    if (!name) { toast('이름 입력', 'error'); return; }
+    const proj = getProject();
+    proj.bots.push({
+      id: 'bot_' + uid(),
+      name,
+      role: $('bot-new-role').value.trim(),
+      emoji: $('bot-new-emoji').value.trim() || '🤖',
+      systemPrompt: $('bot-new-prompt').value.trim(),
+      active: true,
+      isBot: true,
+    });
+    if (!isGuestMode) {
+      API.createBot({ name, role: $('bot-new-role').value.trim(), avatar: $('bot-new-emoji').value.trim() || '🤖', system_prompt: $('bot-new-prompt').value.trim(), is_active: 1 });
+    }
+    saveState();
+    renderSettingsView();
+    renderMemberList();
+    closeModal();
+    toast('봇 추가됨', 'success');
+  });
+}
+
+// ===== Member Management =====
+
+function showAddMemberModal() {
+  showModal('팀원 추가', `
+    <div class="settings-field"><label>이름</label><input id="mem-new-name" placeholder="팀원 이름"></div>
+    <div class="settings-field"><label>역할</label><input id="mem-new-role" placeholder="역할"></div>
+    <div class="settings-field"><label>아바타 이모지</label><input id="mem-new-emoji" value="👤" maxlength="4"></div>
+    <div class="settings-field"><label>색상</label><input id="mem-new-color" type="color" value="#6b7280"></div>
+  `, () => {
+    const name = $('mem-new-name').value.trim();
+    if (!name) { toast('이름 입력', 'error'); return; }
+    const proj = getProject();
+    proj.members.push({
+      id: 'mem_' + uid(),
+      name,
+      role: $('mem-new-role').value.trim(),
+      emoji: $('mem-new-emoji').value.trim() || '👤',
+      color: $('mem-new-color').value,
+    });
+    if (!isGuestMode) {
+      API.createMember({ project_id: proj.id, name, role: $('mem-new-role').value.trim(), avatar_color: $('mem-new-color').value });
+    }
+    saveState();
+    renderSettingsView();
+    renderMemberList();
+    closeModal();
+    toast('팀원 추가됨', 'success');
+  });
+}
+
+function deleteMember(memId) {
+  if (!isGuestMode) API.deleteMember(memId);
+  const proj = getProject();
+  proj.members = proj.members.filter(m => m.id !== memId);
+  saveState();
+  renderSettingsView();
+  renderMemberList();
+}
+
+// ===== Data Export/Import =====
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chatub-backup-${formatDate(Date.now())}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('데이터 내보내기 완료', 'success');
+}
+
+function importData() {
+  const input = $('import-input');
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.projects) {
+          state = data;
+          saveState();
+          renderAll();
+          toast('데이터 가져오기 완료', 'success');
+        } else {
+          toast('잘못된 형식', 'error');
+        }
+      } catch(e) { toast('파일 파싱 실패', 'error'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function confirmClearData() {
+  if (confirm('모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+    // Remove all per-project keys
+    state.projects.forEach(p => localStorage.removeItem(projectStorageKey(p.id)));
+    localStorage.removeItem(STORAGE_META);
+    localStorage.removeItem(STORAGE_KEY); // legacy key
+    state = { currentProject: null, projects: [] };
+    loadState();
+    renderAll();
+    toast('데이터 삭제 완료', 'success');
+  }
+}
+
+// ================================================================
+// MODAL
+// ================================================================
+
+function showModal(title, bodyHtml, onConfirm) {
+  $('modal-title').textContent = title;
+  $('modal-body').innerHTML = bodyHtml;
+  $('modal-footer').innerHTML = `
+    <button class="btn btn-secondary" onclick="closeModal()">취소</button>
+    <button class="btn btn-primary" id="modal-confirm-btn">확인</button>
+  `;
+  $('modal-confirm-btn').onclick = onConfirm;
+  $('modal-overlay').classList.add('show');
+
+  // Focus first input
+  setTimeout(() => {
+    const firstInput = $('modal-body').querySelector('input, textarea');
+    if (firstInput) firstInput.focus();
+  }, 100);
+}
+
+function closeModal() {
+  $('modal-overlay').classList.remove('show');
+}
+
+// ================================================================
+// IMAGE PREVIEW
+// ================================================================
+
+function previewImage(src) {
+  $('img-preview-img').src = src;
+  $('img-preview').classList.add('show');
+}
+
+// ================================================================
+// THEME
+// ================================================================
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const newTheme = current === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('chatub-theme', newTheme);
+  $('btn-toggle-theme').textContent = newTheme === 'light' ? '🌙' : '☀️';
+}
+
+function loadTheme() {
+  const theme = localStorage.getItem('chatub-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  $('btn-toggle-theme').textContent = theme === 'light' ? '🌙' : '☀️';
+}
+
+function setThemeFromSelect(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('chatub-theme', theme);
+  $('btn-toggle-theme').textContent = theme === 'light' ? '🌙' : '☀️';
+}
+
+// ================================================================
+// MOBILE / VIEW SWITCHING
+// ================================================================
+
+let currentView = 'chat';
+
+function switchView(view) {
+  currentView = view;
+  $('chat-view').style.display = view === 'chat' ? 'flex' : 'none';
+  $('task-view').style.display = view === 'tasks' ? 'flex' : 'none';
+  $('settings-view').style.display = view === 'settings' ? 'block' : 'none';
+
+  $$('.mobile-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+
+  if (view === 'tasks') renderTaskView();
+  if (view === 'settings') renderSettingsView();
+}
+
+function closeSidebar() {
+  $('sidebar').classList.remove('open');
+}
+
+function openSidebar() {
+  $('sidebar').classList.add('open');
+}
+
+// ================================================================
+// INLINE CHAT SEARCH
+// ================================================================
+
+let inlineSearchState = { active: false, matches: [], currentIdx: -1, query: '' };
+
+function openInlineSearch() {
+  const bar = $('chat-search-bar');
+  bar.style.display = 'flex';
+  inlineSearchState.active = true;
+  const input = $('inline-search-input');
+  input.value = inlineSearchState.query || '';
+  input.focus();
+  input.select();
+}
+
+function closeInlineSearch() {
+  $('chat-search-bar').style.display = 'none';
+  inlineSearchState.active = false;
+  inlineSearchState.matches = [];
+  inlineSearchState.currentIdx = -1;
+  inlineSearchState.query = '';
+  $('inline-search-counter').textContent = '';
+  clearInlineHighlights();
+}
+
+function clearInlineHighlights() {
+  document.querySelectorAll('#messages-container .search-highlight').forEach(el => {
+    const parent = el.parentNode;
+    parent.replaceChild(document.createTextNode(el.textContent), el);
+    parent.normalize();
+  });
+}
+
+function performInlineSearch(query) {
+  clearInlineHighlights();
+  inlineSearchState.matches = [];
+  inlineSearchState.currentIdx = -1;
+  inlineSearchState.query = query;
+
+  if (!query.trim()) {
+    $('inline-search-counter').textContent = '';
+    return;
+  }
+
+  const container = $('messages-container');
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escapedQuery})`, 'gi');
+
+  // Walk text nodes in message bodies only
+  const msgBodies = container.querySelectorAll('.msg-body');
+  msgBodies.forEach(body => {
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+    const textNodes = [];
+    while (walker.nextNode()) {
+      if (walker.currentNode.textContent.toLowerCase().includes(query.toLowerCase())) {
+        textNodes.push(walker.currentNode);
+      }
+    }
+    textNodes.forEach(node => {
+      const parts = node.textContent.split(regex);
+      if (parts.length <= 1) return;
+      const frag = document.createDocumentFragment();
+      parts.forEach(part => {
+        if (part.toLowerCase() === query.toLowerCase()) {
+          const span = document.createElement('span');
+          span.className = 'search-highlight';
+          span.textContent = part;
+          frag.appendChild(span);
+          inlineSearchState.matches.push(span);
+        } else {
+          frag.appendChild(document.createTextNode(part));
+        }
+      });
+      node.parentNode.replaceChild(frag, node);
+    });
+  });
+
+  const total = inlineSearchState.matches.length;
+  if (total > 0) {
+    inlineSearchState.currentIdx = 0;
+    updateInlineSearchHighlight();
+  }
+  $('inline-search-counter').textContent = total > 0 ? `1/${total}` : '0개';
+}
+
+function updateInlineSearchHighlight() {
+  const { matches, currentIdx } = inlineSearchState;
+  matches.forEach((m, i) => m.classList.toggle('current', i === currentIdx));
+  if (matches[currentIdx]) {
+    matches[currentIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  $('inline-search-counter').textContent = `${currentIdx + 1}/${matches.length}`;
+}
+
+function navigateInlineSearch(direction) {
+  const { matches } = inlineSearchState;
+  if (!matches.length) return;
+  if (direction === 'next') {
+    inlineSearchState.currentIdx = (inlineSearchState.currentIdx + 1) % matches.length;
+  } else {
+    inlineSearchState.currentIdx = (inlineSearchState.currentIdx - 1 + matches.length) % matches.length;
+  }
+  updateInlineSearchHighlight();
+}
+
+// ================================================================
+// KEYBOARD SHORTCUTS
+// ================================================================
+
+function handleGlobalKeydown(e) {
+  // Ctrl+K: Open search overlay
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    openSearch();
+  }
+  // Ctrl+F: Open inline chat search
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f' && currentView === 'chat') {
+    e.preventDefault();
+    openInlineSearch();
+  }
+  // Ctrl+Enter: Send (when input focused)
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    const input = $('msg-input');
+    if (document.activeElement === input) {
+      e.preventDefault();
+      sendMessage(input.value);
+      input.value = '';
+      autoResize(input);
+    }
+  }
+  // Ctrl+N: New channel
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+    e.preventDefault();
+    addChannel();
+  }
+  // Escape: Close overlays
+  if (e.key === 'Escape') {
+    if (inlineSearchState.active) { closeInlineSearch(); return; }
+    closeSearch();
+    closeModal();
+    $('emoji-picker').classList.remove('show');
+    $('img-preview').classList.remove('show');
+    closeSidebar();
+    if (!$('right-panel').classList.contains('hidden')) {
+      $('right-panel').classList.add('hidden');
+    }
+  }
+}
+
+// Auto-resize textarea
+function autoResize(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+}
+
+// ================================================================
+// EVENT LISTENERS
+// ================================================================
+
+// ================================================================
+// AUTH & API LAYER
+// ================================================================
+
+const AUTH_TOKEN_KEY = 'chatub_token';
+const AUTH_USER_KEY = 'chatub_user';
+const AUTH_MODE_KEY = 'chatub_mode';
+
+let authUser = null; // { id, username, display_name, avatar_color }
+let isGuestMode = false;
+
+// ===== API Communication Layer =====
+const API = {
+  get token() { return localStorage.getItem(AUTH_TOKEN_KEY); },
+
+  async request(method, path, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (this.token) headers['Authorization'] = 'Bearer ' + this.token;
+
+    const opts = { method, headers };
+    if (body && method !== 'GET') opts.body = JSON.stringify(body);
+
+    try {
+      const resp = await fetch('/api/' + path, opts);
+      const data = await resp.json();
+
+      if (resp.status === 401) {
+        // Session expired
+        toast('세션이 만료되었습니다. 다시 로그인해주세요.', 'error');
+        handleLogout();
+        return { ok: false, error: '세션 만료' };
+      }
+
+      return data;
+    } catch(e) {
+      console.error('API error:', e);
+      toast('네트워크 오류', 'error');
+      return { ok: false, error: e.message };
+    }
+  },
+
+  // Auth
+  async register(username, password, display_name) {
+    return this.request('POST', 'auth/register', { username, password, display_name });
+  },
+  async login(username, password) {
+    return this.request('POST', 'auth/login', { username, password });
+  },
+  async me() {
+    return this.request('GET', 'auth/me');
+  },
+
+  // Projects
+  async getProjects() { return this.request('GET', 'projects'); },
+  async createProject(name, description, color) { return this.request('POST', 'projects', { name, description, color }); },
+  async updateProject(id, data) { return this.request('PUT', 'projects/' + id, data); },
+  async deleteProject(id) { return this.request('DELETE', 'projects/' + id); },
+
+  // Channels
+  async getChannels(projectId) { return this.request('GET', 'channels?project_id=' + projectId); },
+  async createChannel(data) { return this.request('POST', 'channels', data); },
+  async updateChannel(id, data) { return this.request('PUT', 'channels/' + id, data); },
+  async deleteChannel(id) { return this.request('DELETE', 'channels/' + id); },
+
+  // Messages
+  async getMessages(channelId, limit, before) {
+    let path = 'messages?channel_id=' + channelId;
+    if (limit) path += '&limit=' + limit;
+    if (before) path += '&before=' + before;
+    return this.request('GET', path);
+  },
+  async sendMessage(data) { return this.request('POST', 'messages', data); },
+  async updateMessage(id, data) { return this.request('PUT', 'messages/' + id, data); },
+  async deleteMessage(id) { return this.request('DELETE', 'messages/' + id); },
+
+  // Threads
+  async getThreads(messageId) { return this.request('GET', 'threads?message_id=' + messageId); },
+  async createThread(data) { return this.request('POST', 'threads', data); },
+
+  // Tasks
+  async getTasks(projectId, status, milestoneId) {
+    let path = 'tasks?project_id=' + projectId;
+    if (status) path += '&status=' + status;
+    if (milestoneId) path += '&milestone_id=' + milestoneId;
+    return this.request('GET', path);
+  },
+  async createTask(data) { return this.request('POST', 'tasks', data); },
+  async updateTask(id, data) { return this.request('PUT', 'tasks/' + id, data); },
+  async deleteTask(id) { return this.request('DELETE', 'tasks/' + id); },
+
+  // Milestones
+  async getMilestones(projectId) { return this.request('GET', 'milestones?project_id=' + projectId); },
+  async createMilestone(data) { return this.request('POST', 'milestones', data); },
+  async updateMilestone(id, data) { return this.request('PUT', 'milestones/' + id, data); },
+  async deleteMilestone(id) { return this.request('DELETE', 'milestones/' + id); },
+
+  // Members
+  async getMembers(projectId) { return this.request('GET', 'members?project_id=' + projectId); },
+  async createMember(data) { return this.request('POST', 'members', data); },
+  async updateMember(id, data) { return this.request('PUT', 'members/' + id, data); },
+  async deleteMember(id) { return this.request('DELETE', 'members/' + id); },
+
+  // Bots
+  async getBots(projectId) { return this.request('GET', 'bots?project_id=' + (projectId || '')); },
+  async createBot(data) { return this.request('POST', 'bots', data); },
+  async updateBot(id, data) { return this.request('PUT', 'bots/' + id, data); },
+  async deleteBot(id) { return this.request('DELETE', 'bots/' + id); },
+
+  // Settings
+  async getSettings() { return this.request('GET', 'settings'); },
+  async updateSettings(data) { return this.request('PUT', 'settings', data); },
+
+  // Migration
+  async migrate(data) { return this.request('POST', 'migrate', data); },
+};
+
+// ===== Auth UI Functions =====
+
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.auth-form').forEach(f => f.classList.toggle('active', f.id === tab + '-form'));
+  // Clear errors
+  $('login-error').textContent = '';
+  $('register-error').textContent = '';
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = $('login-btn');
+  btn.disabled = true;
+  $('login-error').textContent = '';
+
+  const username = $('login-username').value.trim();
+  const password = $('login-password').value;
+
+  const res = await API.login(username, password);
+  btn.disabled = false;
+
+  if (res.ok) {
+    const d = res.data || res;
+    localStorage.setItem(AUTH_TOKEN_KEY, d.token);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(d.user));
+    localStorage.removeItem(AUTH_MODE_KEY);
+    authUser = d.user;
+    isGuestMode = false;
+    enterApp();
+  } else {
+    $('login-error').textContent = res.error || '로그인 실패';
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const btn = $('register-btn');
+  btn.disabled = true;
+  $('register-error').textContent = '';
+
+  const username = $('reg-username').value.trim();
+  const password = $('reg-password').value;
+  const display_name = $('reg-display-name').value.trim();
+
+  if (username.length < 2) { $('register-error').textContent = '사용자명은 2자 이상이어야 합니다'; btn.disabled = false; return; }
+  if (password.length < 4) { $('register-error').textContent = '비밀번호는 4자 이상이어야 합니다'; btn.disabled = false; return; }
+  if (!display_name) { $('register-error').textContent = '표시 이름을 입력하세요'; btn.disabled = false; return; }
+
+  const res = await API.register(username, password, display_name);
+  btn.disabled = false;
+
+  if (res.ok) {
+    const d = res.data || res;
+    localStorage.setItem(AUTH_TOKEN_KEY, d.token);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(d.user));
+    localStorage.removeItem(AUTH_MODE_KEY);
+    authUser = d.user;
+    isGuestMode = false;
+    enterApp();
+    toast('가입 완료! 환영합니다.', 'success');
+  } else {
+    $('register-error').textContent = res.error || '가입 실패';
+  }
+}
+
+function enterGuestMode() {
+  localStorage.setItem(AUTH_MODE_KEY, 'guest');
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+  authUser = null;
+  isGuestMode = true;
+  enterApp();
+}
+
+function handleLogout() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+  localStorage.removeItem(AUTH_MODE_KEY);
+  authUser = null;
+  isGuestMode = false;
+  $('app').classList.add('hidden');
+  $('auth-screen').classList.remove('hidden');
+  // Reset forms
+  $('login-username').value = '';
+  $('login-password').value = '';
+  $('login-error').textContent = '';
+}
+
+function enterApp() {
+  $('auth-screen').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  updateProfileUI();
+  loadStateAndRender();
+}
+
+function updateProfileUI() {
+  const avatar = $('profile-avatar');
+  const nameDisplay = $('profile-name-display');
+  const migrateBtn = $('btn-migrate-data');
+
+  if (isGuestMode) {
+    avatar.textContent = '👤';
+    avatar.style.background = 'var(--bg-tertiary)';
+    nameDisplay.textContent = '게스트 모드';
+    // Show migrate button if guest has data and could switch to login
+    migrateBtn.style.display = 'none';
+  } else if (authUser) {
+    avatar.textContent = authUser.display_name ? authUser.display_name.charAt(0).toUpperCase() : '?';
+    avatar.style.background = authUser.avatar_color || 'var(--accent)';
+    nameDisplay.textContent = authUser.display_name || authUser.username;
+    // Show migrate option if there's guest data in localStorage
+    const hasGuestData = localStorage.getItem('chatub_meta') || localStorage.getItem('chatub');
+    migrateBtn.style.display = hasGuestData ? 'block' : 'none';
+  }
+}
+
+function toggleProfileDropdown() {
+  $('profile-dropdown').classList.toggle('show');
+}
+
+// Close profile dropdown on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.profile-area')) {
+    const dd = document.getElementById('profile-dropdown');
+    if (dd) dd.classList.remove('show');
+  }
+});
+
+function showProfileEdit() {
+  $('profile-dropdown').classList.remove('show');
+  switchView('settings');
+}
+
+// ===== Data Migration (Guest -> Login) =====
+
+function showMigrateModal() {
+  $('profile-dropdown').classList.remove('show');
+  showModal('데이터 마이그레이션', `
+    <p style="margin-bottom:16px;color:var(--text-secondary);font-size:13px;">
+      로컬에 저장된 게스트 데이터를 서버로 이전합니다.<br>
+      기존 서버 데이터는 유지되며, 게스트 프로젝트가 추가됩니다.
+    </p>
+    <div id="migrate-status" style="font-size:13px;color:var(--text-muted);"></div>
+  `, async () => {
+    $('migrate-status').textContent = '마이그레이션 진행 중...';
+
+    // Collect guest data
+    const metaRaw = localStorage.getItem('chatub_meta');
+    const guestProjects = [];
+
+    if (metaRaw) {
+      const meta = JSON.parse(metaRaw);
+      (meta.projectIds || []).forEach(id => {
+        const raw = localStorage.getItem('chatub_' + id);
+        if (raw) guestProjects.push(JSON.parse(raw));
+      });
+    } else {
+      const raw = localStorage.getItem('chatub');
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.projects) guestProjects.push(...data.projects);
+      }
+    }
+
+    if (!guestProjects.length) {
+      $('migrate-status').textContent = '마이그레이션할 데이터가 없습니다.';
+      return;
+    }
+
+    const res = await API.migrate({ projects: guestProjects });
+    if (res.ok) {
+      // Clear guest data
+      if (metaRaw) {
+        const meta = JSON.parse(metaRaw);
+        (meta.projectIds || []).forEach(id => localStorage.removeItem('chatub_' + id));
+        localStorage.removeItem('chatub_meta');
+      }
+      localStorage.removeItem('chatub');
+
+      closeModal();
+      toast('마이그레이션 완료!', 'success');
+      updateProfileUI();
+      await loadStateFromServer();
+      renderAll();
+    } else {
+      $('migrate-status').textContent = '오류: ' + (res.error || '마이그레이션 실패');
+    }
+  });
+}
+
+// ===== Server-backed state loading =====
+
+// Cache for loaded data
+let serverChannelMessages = {}; // channelId -> [messages]
+let serverMessagePagination = {}; // channelId -> { hasMore, oldestTs }
+
+async function loadStateFromServer() {
+  if (isGuestMode) return;
+
+  const projRes = await API.getProjects();
+  if (!projRes.ok) return;
+
+  state.projects = [];
+
+  for (const sp of projRes.data) {
+    // Load channels, members, bots, tasks, milestones for each project
+    const [chRes, memRes, botRes, taskRes, msRes] = await Promise.all([
+      API.getChannels(sp.id),
+      API.getMembers(sp.id),
+      API.getBots(sp.id),
+      API.getTasks(sp.id),
+      API.getMilestones(sp.id),
+    ]);
+
+    const channels = (chRes.data || []).map(ch => ({
+      id: ch.id,
+      name: ch.name,
+      icon: ch.icon || '#',
+      color: ch.color || '#6366f1',
+      messages: [], // messages loaded lazily
+      unread: 0,
+    }));
+
+    const members = [
+      { id: authUser.id, name: authUser.display_name, emoji: '😊', role: '나', color: authUser.avatar_color || '#6366f1', isMe: true },
+      ...(memRes.data || []).map(m => ({
+        id: m.id, name: m.name, role: m.role, emoji: '👤',
+        color: m.avatar_color || '#6366f1',
+      }))
+    ];
+
+    const bots = (botRes.data || []).map(b => ({
+      id: b.id, name: b.name, role: b.role,
+      emoji: b.avatar || '🤖',
+      systemPrompt: b.system_prompt || '',
+      active: !!b.is_active,
+      isBot: true,
+    }));
+
+    const tasks = (taskRes.data || []).map(t => ({
+      id: t.id, num: t.id.slice(-4), // short id for display
+      title: t.title, desc: t.description || '',
+      status: t.status || 'todo',
+      milestoneId: t.milestone_id || '',
+      deadline: t.deadline ? new Date(t.deadline * 1000).toISOString().split('T')[0] : '',
+      createdAt: t.created_at * 1000,
+    }));
+
+    const milestones = (msRes.data || []).map(m => ({
+      id: m.id, name: m.name,
+      deadline: m.deadline ? new Date(m.deadline * 1000).toISOString().split('T')[0] : '',
+      color: m.color || '#6366f1',
+    }));
+
+    // Load settings
+    const setRes = await API.getSettings();
+    const settings = setRes.ok && setRes.data ? {
+      gatewayUrl: setRes.data.gateway_url || '',
+      gatewayToken: setRes.data.gateway_token || '',
+      contextLength: setRes.data.context_length || 20,
+    } : { gatewayUrl: '', gatewayToken: '', contextLength: 20 };
+
+    const proj = {
+      id: sp.id,
+      name: sp.name,
+      desc: sp.description || '',
+      color: sp.color || '#6366f1',
+      channels,
+      currentChannel: channels[0]?.id || '',
+      members,
+      bots,
+      tasks,
+      milestones,
+      settings,
+      nextTaskId: tasks.length + 1,
+    };
+    state.projects.push(proj);
+  }
+
+  if (!state.projects.length) {
+    // Should not happen since register creates a default project
+    return;
+  }
+
+  state.currentProject = state.projects[0].id;
+}
+
+async function loadChannelMessages(channelId, limit = 50, before = null) {
+  if (isGuestMode) return;
+
+  const res = await API.getMessages(channelId, limit, before);
+  if (!res.ok) return [];
+
+  const proj = getProject();
+  const messages = (res.data || []).map(m => ({
+    id: m.id,
+    authorId: m.user_id || m.bot_id || '',
+    author: m.author_name || '알 수 없음',
+    text: m.text || '',
+    image: m.image || null,
+    ts: m.created_at * 1000,
+    editedAt: m.edited_at ? m.edited_at * 1000 : null,
+    isBot: !!m.bot_id,
+    reactions: m.reactions_json ? (typeof m.reactions_json === 'string' ? JSON.parse(m.reactions_json) : m.reactions_json) : {},
+    replies: [], // loaded separately via threads API
+  }));
+
+  // messages come newest first from API, reverse for display
+  messages.reverse();
+
+  // Update pagination state
+  if (!serverMessagePagination[channelId]) {
+    serverMessagePagination[channelId] = { hasMore: true, oldestTs: null };
+  }
+
+  if (messages.length < limit) {
+    serverMessagePagination[channelId].hasMore = false;
+  }
+
+  if (messages.length > 0) {
+    serverMessagePagination[channelId].oldestTs = Math.floor(messages[0].ts / 1000);
+  }
+
+  return messages;
+}
+
+async function loadMoreMessages() {
+  const proj = getProject();
+  if (!proj || isGuestMode) return;
+  const ch = proj.channels.find(c => c.id === proj.currentChannel);
+  if (!ch) return;
+
+  const pagination = serverMessagePagination[ch.id];
+  if (!pagination || !pagination.hasMore) {
+    toast('더 이상 메시지가 없습니다', 'info');
+    return;
+  }
+
+  const container = $('messages-container');
+  const scrollHeightBefore = container.scrollHeight;
+
+  const older = await loadChannelMessages(ch.id, 50, pagination.oldestTs);
+  if (older.length) {
+    ch.messages = [...older, ...ch.messages];
+    renderMessages();
+    // Maintain scroll position
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight - scrollHeightBefore;
+    });
+  }
+}
+
+// ===== Dual-mode loadState/saveState =====
+
+async function loadStateAndRender() {
+  if (isGuestMode) {
+    loadState(); // existing localStorage-based function
+    renderAll();
+  } else {
+    await loadStateFromServer();
+    if (state.projects.length && state.currentProject) {
+      // Load messages for current channel
+      const proj = getProject();
+      if (proj && proj.currentChannel) {
+        const msgs = await loadChannelMessages(proj.currentChannel);
+        const ch = proj.channels.find(c => c.id === proj.currentChannel);
+        if (ch) ch.messages = msgs;
+      }
+    }
+    renderAll();
+  }
+}
+
+function init() {
+  loadTheme();
+
+  // Check auth state
+  const savedMode = localStorage.getItem(AUTH_MODE_KEY);
+  const savedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+  const savedUser = localStorage.getItem(AUTH_USER_KEY);
+
+  if (savedMode === 'guest') {
+    // Guest mode - use existing localStorage approach
+    isGuestMode = true;
+    authUser = null;
+    enterApp();
+  } else if (savedToken && savedUser) {
+    // Has token - verify and enter
+    authUser = JSON.parse(savedUser);
+    isGuestMode = false;
+    // Verify token asynchronously
+    API.me().then(res => {
+      if (res.ok) {
+        const me = res.data || res;
+        authUser = me.user;
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(me.user));
+        enterApp();
+      } else {
+        // Token expired/invalid
+        handleLogout();
+      }
+    });
+  } else {
+    // Show auth screen
+    $('app').classList.add('hidden');
+    $('auth-screen').classList.remove('hidden');
+  }
+
+  // Message input
+  const msgInput = $('msg-input');
+  msgInput.addEventListener('keydown', (e) => {
+    if (handleMentionKeydown(e)) return;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(msgInput.value);
+      msgInput.value = '';
+      autoResize(msgInput);
+    }
+  });
+  msgInput.addEventListener('input', () => {
+    autoResize(msgInput);
+    handleMentionInput(msgInput);
+  });
+
+  // Send button
+  $('btn-send').addEventListener('click', () => {
+    sendMessage(msgInput.value);
+    msgInput.value = '';
+    autoResize(msgInput);
+  });
+
+  // File attachment
+  $('btn-attach').addEventListener('click', () => $('file-input').click());
+  $('file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      processImage(file, (dataUrl) => {
+        sendMessage(msgInput.value, dataUrl);
+        msgInput.value = '';
+        autoResize(msgInput);
+      });
+    }
+    e.target.value = '';
+  });
+
+  // Image drag & drop on chat area
+  const chatView = $('chat-view');
+  chatView.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    chatView.style.outline = '2px dashed var(--accent)';
+  });
+  chatView.addEventListener('dragleave', () => {
+    chatView.style.outline = '';
+  });
+  chatView.addEventListener('drop', (e) => {
+    e.preventDefault();
+    chatView.style.outline = '';
+    const files = e.dataTransfer.files;
+    if (files.length && files[0].type.startsWith('image/')) {
+      processImage(files[0], (dataUrl) => {
+        sendMessage(msgInput.value, dataUrl);
+        msgInput.value = '';
+        autoResize(msgInput);
+      });
+    }
+  });
+
+  // Channel add
+  $('btn-add-channel').addEventListener('click', addChannel);
+
+  // Member add
+  $('btn-add-member').addEventListener('click', showAddMemberModal);
+
+  // Project switcher
+  $('project-select').addEventListener('change', async (e) => {
+    state.currentProject = e.target.value;
+    saveState();
+    if (!isGuestMode) {
+      const proj = getProject();
+      if (proj && proj.currentChannel) {
+        const ch = proj.channels.find(c => c.id === proj.currentChannel);
+        if (ch && !ch.messages.length) {
+          const msgs = await loadChannelMessages(proj.currentChannel);
+          ch.messages = msgs;
+        }
+      }
+    }
+    renderAll();
+  });
+
+  // New project
+  $('btn-new-project').addEventListener('click', () => {
+    showModal('새 프로젝트', `
+      <div class="settings-field"><label>이름</label><input id="new-proj-name" placeholder="프로젝트 이름"></div>
+      <div class="settings-field"><label>설명</label><input id="new-proj-desc" placeholder="설명"></div>
+      <div class="settings-field"><label>색상</label><input id="new-proj-color" type="color" value="#6366f1"></div>
+    `, () => {
+      const name = $('new-proj-name').value.trim();
+      if (!name) { toast('이름 입력', 'error'); return; }
+      createProject(name, $('new-proj-desc').value.trim(), $('new-proj-color').value);
+      renderAll();
+      closeModal();
+      toast('프로젝트 생성됨', 'success');
+    });
+  });
+
+  // Sidebar buttons
+  $('btn-tasks-view').addEventListener('click', () => { switchView('tasks'); closeSidebar(); });
+  $('btn-chat-view').addEventListener('click', () => { switchView('chat'); closeSidebar(); });
+  $('btn-settings-view').addEventListener('click', () => { switchView('settings'); closeSidebar(); });
+
+  // Header buttons
+  $('btn-search').addEventListener('click', () => {
+    if (currentView === 'chat') openInlineSearch();
+    else openSearch();
+  });
+  $('btn-toggle-theme').addEventListener('click', toggleTheme);
+  $('btn-toggle-panel').addEventListener('click', () => {
+    $('right-panel').classList.toggle('hidden');
+  });
+  $('btn-hamburger').addEventListener('click', openSidebar);
+  $('sidebar-backdrop').addEventListener('click', closeSidebar);
+
+  // Close panel
+  $('btn-close-panel').addEventListener('click', () => {
+    $('right-panel').classList.add('hidden');
+  });
+
+  // Global search overlay
+  $('search-input').addEventListener('input', (e) => performSearch(e.target.value));
+  $('search-overlay').addEventListener('click', (e) => {
+    if (e.target === $('search-overlay')) closeSearch();
+  });
+
+  // Inline chat search
+  const inlineSearchInput = $('inline-search-input');
+  let inlineSearchTimer = null;
+  inlineSearchInput.addEventListener('input', () => {
+    clearTimeout(inlineSearchTimer);
+    inlineSearchTimer = setTimeout(() => performInlineSearch(inlineSearchInput.value), 150);
+  });
+  inlineSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) navigateInlineSearch('prev');
+      else navigateInlineSearch('next');
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeInlineSearch();
+    }
+  });
+  $('btn-search-next').addEventListener('click', () => navigateInlineSearch('next'));
+  $('btn-search-prev').addEventListener('click', () => navigateInlineSearch('prev'));
+  $('btn-search-close').addEventListener('click', closeInlineSearch);
+
+  // Modal close
+  $('modal-close').addEventListener('click', closeModal);
+  $('modal-overlay').addEventListener('click', (e) => {
+    if (e.target === $('modal-overlay')) closeModal();
+  });
+
+  // Emoji picker close on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.emoji-picker') && !e.target.closest('.add-reaction-btn') && !e.target.closest('.msg-action-btn')) {
+      $('emoji-picker').classList.remove('show');
+    }
+  });
+
+  // Image preview close
+  $('img-preview').addEventListener('click', () => {
+    $('img-preview').classList.remove('show');
+  });
+
+  // Task filter buttons
+  $('task-filters').addEventListener('click', (e) => {
+    const btn = e.target.closest('.task-filter-btn');
+    if (!btn) return;
+    currentTaskFilter = btn.dataset.filter;
+    $$('.task-filter-btn').forEach(b => b.classList.toggle('active', b === btn));
+    renderTaskView();
+  });
+
+  // Task search
+  $('task-search').addEventListener('input', () => renderTaskView());
+
+  // Milestone filter
+  $('milestone-filter').addEventListener('change', (e) => {
+    currentMilestoneFilter = e.target.value;
+    renderTaskView();
+  });
+
+  // Add task buttons
+  $('btn-add-task-main').addEventListener('click', () => showAddTaskModal('todo'));
+  document.querySelectorAll('.add-task-btn').forEach(btn => {
+    btn.addEventListener('click', () => showAddTaskModal(btn.dataset.status));
+  });
+
+  // Mobile tabs
+  $$('.mobile-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchView(tab.dataset.view));
+  });
+
+  // Global keyboard shortcuts
+  document.addEventListener('keydown', handleGlobalKeydown);
+
+  // CSS blink animation for streaming cursor
+  const style = document.createElement('style');
+  style.textContent = '@keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }';
+  document.head.appendChild(style);
+}
+
+// Start
+init();
+</script>
+</body>
+</html>
