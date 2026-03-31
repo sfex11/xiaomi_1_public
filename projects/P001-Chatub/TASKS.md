@@ -15,7 +15,7 @@
 - [ ] Oracle VPS 연동
 
 ### 레노버 — UI/UX/프론트엔드
-- [ ] index.html 리팩토링 (모던 디자인)
+- [x] index.html 리팩토링 (모던 디자인) ← commit 1b5501f
 - [ ] 에이전트 프로필 UI
 - [ ] 포럼 토픽 구조 UI
 - [ ] 다크모드 + 반응형
