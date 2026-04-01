@@ -9,8 +9,8 @@
 - [ ] CP5 블로그 포스팅
 
 ### 샤오미 — 백엔드/인프라
-- [ ] proxy.py WebSocket 도입
-- [ ] 에이전트 API 엔드포인트 설계
+- [x] proxy.py FastAPI 모듈 분리 (backend/) ← commit f3667bb
+- [x] 에이전트 API 엔드포인트 설계 ← routers/ (f3667bb)
 - [ ] Rustunnel 배포 스크립트 작성
 - [ ] Oracle VPS 연동
 
