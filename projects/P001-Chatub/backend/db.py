@@ -166,8 +166,31 @@ CREATE TABLE IF NOT EXISTS settings (
 """
 
 
+MIGRATIONS = [
+    # Phase 3: Agent API columns on ai_bots
+    """
+    ALTER TABLE ai_bots ADD COLUMN api_key TEXT;
+    """,
+    """
+    ALTER TABLE ai_bots ADD COLUMN webhook_url TEXT;
+    """,
+    """
+    ALTER TABLE ai_bots ADD COLUMN permissions TEXT DEFAULT 'read,write';
+    """,
+]
+
+
+def _run_migrations(conn):
+    for sql in MIGRATIONS:
+        try:
+            conn.executescript(sql)
+        except Exception:
+            pass  # column already exists
+
+
 def init_db():
     conn = get_db()
     conn.executescript(SCHEMA_SQL)
+    _run_migrations(conn)
     conn.commit()
     conn.close()

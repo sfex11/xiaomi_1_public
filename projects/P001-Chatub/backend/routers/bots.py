@@ -1,5 +1,6 @@
 """AI Bots CRUD."""
 
+import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -55,15 +56,18 @@ def create_bot(req: BotCreate, user_id: str = Depends(get_current_user)):
             return json_err("찾을 수 없습니다", 404)
         bid = new_id()
         ts = now_ts()
+        api_key = "agent_" + secrets.token_urlsafe(32)
         db.execute(
-            "INSERT INTO ai_bots (id, user_id, project_id, name, role, avatar, system_prompt, is_active, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO ai_bots (id, user_id, project_id, name, role, avatar, system_prompt, is_active, api_key, permissions, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (bid, user_id, req.project_id, req.name, req.role,
              req.avatar, req.system_prompt,
-             1 if req.is_active else 0, ts)
+             1 if req.is_active else 0, api_key, "read,write", ts)
         )
         db.commit()
         row = db.execute("SELECT * FROM ai_bots WHERE id=?", (bid,)).fetchone()
-        return json_ok(dict(row))
+        data = dict(row)
+        data["api_key"] = api_key
+        return json_ok(data)
     finally:
         db.close()
 
@@ -83,6 +87,21 @@ def update_bot(rid: str, req: BotUpdate, user_id: str = Depends(get_current_user
             db.commit()
         row = db.execute("SELECT * FROM ai_bots WHERE id=?", (rid,)).fetchone()
         return json_ok(dict(row))
+    finally:
+        db.close()
+
+
+@router.post("/bots/{rid}/regenerate-key")
+def regenerate_bot_key(rid: str, user_id: str = Depends(get_current_user)):
+    db = get_db()
+    try:
+        bot = db.execute("SELECT * FROM ai_bots WHERE id=? AND user_id=?", (rid, user_id)).fetchone()
+        if not bot:
+            return json_err("찾을 수 없습니다", 404)
+        new_key = "agent_" + secrets.token_urlsafe(32)
+        db.execute("UPDATE ai_bots SET api_key=? WHERE id=?", (new_key, rid))
+        db.commit()
+        return json_ok({"api_key": new_key})
     finally:
         db.close()
 

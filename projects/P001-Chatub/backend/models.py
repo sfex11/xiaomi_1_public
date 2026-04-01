@@ -157,3 +157,15 @@ class SettingsUpdate(BaseModel):
     gateway_token: Optional[str] = None
     context_length: Optional[int] = None
     theme: Optional[str] = None
+
+
+# -- Agent API --
+
+class AgentAuthRequest(BaseModel):
+    api_key: str
+
+
+class AgentMessageCreate(BaseModel):
+    channel_id: str
+    content: str
+    parent_id: Optional[str] = None
