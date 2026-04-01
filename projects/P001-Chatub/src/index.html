@@ -2050,13 +2050,15 @@ async function callAI(bot, userText, channel) {
     }))
   ];
 
-  const gatewayUrl = settings.gatewayUrl || 'http://127.0.0.1:18789';
-  const model = `openclaw/${bot.id}`;
+  const useProxy = !settings.gatewayUrl;
+  const gatewayUrl = settings.gatewayUrl || '';
+  const model = settings.gatewayUrl ? `openclaw/${bot.id}` : 'default';
 
   try {
-    const apiUrl = (gatewayUrl.replace(/\/+$/, '')) + '/api/chat';
+    const apiUrl = useProxy ? '/api/chat' : (gatewayUrl.replace(/\/+$/, '')) + '/v1/chat/completions';
     const headers = { 'Content-Type': 'application/json' };
     if (settings.gatewayToken) headers['Authorization'] = 'Bearer ' + settings.gatewayToken;
+    if (useProxy) headers['X-Gateway-URL'] = 'http://127.0.0.1:18789';
 
     const response = await fetch(apiUrl, {
       method: 'POST',
