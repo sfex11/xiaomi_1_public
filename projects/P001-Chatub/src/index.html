@@ -1841,6 +1841,8 @@ function switchChannel(channelId) {
       renderMessages();
     });
   }
+  // Connect WebSocket to the new channel
+  WS.connect(channelId);
   saveState();
   renderChannelList();
   renderMessages();
@@ -1940,11 +1942,15 @@ function sendMessage(text, image) {
   ch.messages.push(msg);
 
   if (!isGuestMode) {
-    API.sendMessage({ channel_id: ch.id, text: msg.text, image: msg.image || '' }).then(res => {
-      if (res.ok && res.data) {
-        msg.id = res.data.id;
-      }
-    });
+    // Try WebSocket first for real-time delivery, fall back to REST
+    const wsSent = WS.send({ type: 'message', text: msg.text, image: msg.image || '' });
+    if (!wsSent) {
+      API.sendMessage({ channel_id: ch.id, text: msg.text, image: msg.image || '' }).then(res => {
+        if (res.ok && res.data) {
+          msg.id = res.data.id;
+        }
+      });
+    }
   }
 
   saveState();
@@ -3409,18 +3415,30 @@ const API = {
   async updateProject(id, data) { return this.request('PUT', 'projects/' + id, data); },
   async deleteProject(id) { return this.request('DELETE', 'projects/' + id); },
 
-  async getChannels(projectId) { return this.request('GET', 'channels?project_id=' + projectId); },
-  async createChannel(data) { return this.request('POST', 'channels', data); },
+  // Channels: nested under projects
+  async getChannels(projectId) { return this.request('GET', 'projects/' + projectId + '/channels'); },
+  async createChannel(data) {
+    const pid = data.project_id;
+    const body = { name: data.name, icon: data.icon, color: data.color };
+    return this.request('POST', 'projects/' + pid + '/channels', body);
+  },
   async updateChannel(id, data) { return this.request('PUT', 'channels/' + id, data); },
   async deleteChannel(id) { return this.request('DELETE', 'channels/' + id); },
 
+  // Messages: nested under channels
   async getMessages(channelId, limit, before) {
-    let path = 'messages?channel_id=' + channelId;
-    if (limit) path += '&limit=' + limit;
-    if (before) path += '&before=' + before;
+    let path = 'channels/' + channelId + '/messages';
+    const params = [];
+    if (limit) params.push('limit=' + limit);
+    if (before) params.push('before=' + before);
+    if (params.length) path += '?' + params.join('&');
     return this.request('GET', path);
   },
-  async sendMessage(data) { return this.request('POST', 'messages', data); },
+  async sendMessage(data) {
+    const chId = data.channel_id;
+    const body = { text: data.text, image: data.image || '' };
+    return this.request('POST', 'channels/' + chId + '/messages', body);
+  },
   async updateMessage(id, data) { return this.request('PUT', 'messages/' + id, data); },
   async deleteMessage(id) { return this.request('DELETE', 'messages/' + id); },
 
@@ -3533,6 +3551,7 @@ function enterGuestMode() {
 }
 
 function handleLogout() {
+  WS.disconnect();
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_USER_KEY);
   localStorage.removeItem(AUTH_MODE_KEY);
@@ -3797,6 +3816,166 @@ async function loadMoreMessages() {
   }
 }
 
+// ================================================================
+// WEBSOCKET REAL-TIME CONNECTION
+// ================================================================
+
+const WS = {
+  socket: null,
+  channelId: null,
+  reconnectTimer: null,
+  reconnectDelay: 1000,
+  maxReconnectDelay: 30000,
+
+  connect(channelId) {
+    if (isGuestMode) return;
+    if (this.socket && this.channelId === channelId && this.socket.readyState === WebSocket.OPEN) return;
+
+    this.disconnect();
+    this.channelId = channelId;
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const token = API.token || '';
+    const url = `${proto}//${location.host}/ws/${channelId}?token=${encodeURIComponent(token)}`;
+
+    try {
+      this.socket = new WebSocket(url);
+    } catch (e) {
+      console.warn('WebSocket connection failed:', e);
+      this.scheduleReconnect();
+      return;
+    }
+
+    this.socket.onopen = () => {
+      console.log('[WS] connected to channel', channelId);
+      this.reconnectDelay = 1000;
+    };
+
+    this.socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        this.handleMessage(data);
+      } catch (e) {
+        console.warn('[WS] parse error:', e);
+      }
+    };
+
+    this.socket.onclose = (e) => {
+      console.log('[WS] disconnected', e.code, e.reason);
+      if (this.channelId === channelId) {
+        this.scheduleReconnect();
+      }
+    };
+
+    this.socket.onerror = (e) => {
+      console.warn('[WS] error:', e);
+    };
+  },
+
+  disconnect() {
+    clearTimeout(this.reconnectTimer);
+    if (this.socket) {
+      this.socket.onclose = null;
+      this.socket.close();
+      this.socket = null;
+    }
+    this.channelId = null;
+  },
+
+  scheduleReconnect() {
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => {
+      if (this.channelId && !isGuestMode) {
+        console.log('[WS] reconnecting...');
+        this.connect(this.channelId);
+      }
+    }, this.reconnectDelay);
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+  },
+
+  send(data) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(data));
+      return true;
+    }
+    return false;
+  },
+
+  handleMessage(data) {
+    const proj = getProject();
+    if (!proj) return;
+
+    switch (data.type) {
+      case 'message': {
+        const ch = proj.channels.find(c => c.id === data.channel_id);
+        if (!ch) return;
+        // Avoid duplicates (own messages already added locally)
+        if (ch.messages.find(m => m.id === data.id)) return;
+        const msg = {
+          id: data.id,
+          authorId: data.user_id || data.bot_id || '',
+          author: data.author_name || '알 수 없음',
+          text: data.text || '',
+          image: data.image || null,
+          ts: data.created_at ? data.created_at * 1000 : Date.now(),
+          isBot: !!data.bot_id,
+          reactions: data.reactions_json ? (typeof data.reactions_json === 'string' ? JSON.parse(data.reactions_json) : data.reactions_json) : {},
+          replies: [],
+        };
+        ch.messages.push(msg);
+        if (proj.currentChannel === data.channel_id) {
+          renderMessages();
+        } else {
+          ch.unread = (ch.unread || 0) + 1;
+          renderChannelList();
+        }
+        break;
+      }
+      case 'message_update': {
+        const ch = proj.channels.find(c => c.id === data.channel_id);
+        if (!ch) return;
+        const msg = ch.messages.find(m => m.id === data.id);
+        if (msg) {
+          if (data.text !== undefined) msg.text = data.text;
+          if (data.reactions_json) {
+            msg.reactions = typeof data.reactions_json === 'string' ? JSON.parse(data.reactions_json) : data.reactions_json;
+          }
+          if (proj.currentChannel === data.channel_id) renderMessages();
+        }
+        break;
+      }
+      case 'message_delete': {
+        const ch = proj.channels.find(c => c.id === data.channel_id);
+        if (!ch) return;
+        ch.messages = ch.messages.filter(m => m.id !== data.id);
+        if (proj.currentChannel === data.channel_id) renderMessages();
+        break;
+      }
+      case 'typing': {
+        if (data.user_id !== authUser?.id) {
+          showTypingIndicator(data.display_name || '누군가');
+          clearTimeout(WS._typingTimeout);
+          WS._typingTimeout = setTimeout(hideTypingIndicator, 3000);
+        }
+        break;
+      }
+      case 'user_join':
+      case 'user_leave': {
+        // Could update online status indicators
+        break;
+      }
+      default:
+        console.log('[WS] unknown message type:', data.type);
+    }
+  },
+
+  _typingTimeout: null,
+
+  sendTyping() {
+    this.send({ type: 'typing' });
+  },
+};
+
 // ===== Dual-mode loadState/saveState =====
 
 async function loadStateAndRender() {
@@ -3811,6 +3990,8 @@ async function loadStateAndRender() {
         const msgs = await loadChannelMessages(proj.currentChannel);
         const ch = proj.channels.find(c => c.id === proj.currentChannel);
         if (ch) ch.messages = msgs;
+        // Connect WebSocket to current channel
+        WS.connect(proj.currentChannel);
       }
     }
     renderAll();
@@ -3857,9 +4038,16 @@ function init() {
       autoResize(msgInput);
     }
   });
+  let typingThrottle = 0;
   msgInput.addEventListener('input', () => {
     autoResize(msgInput);
     handleMentionInput(msgInput);
+    // Send typing indicator via WebSocket (throttled)
+    const now = Date.now();
+    if (now - typingThrottle > 2000) {
+      typingThrottle = now;
+      WS.sendTyping();
+    }
   });
 
   // Send button
