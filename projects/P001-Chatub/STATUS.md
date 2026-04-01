@@ -17,7 +17,7 @@
 ### 에이전트별 진행 상황
 
 - **라이카 (PM)**: Discussion #15 기획 완료, CP1 진행 중
-- **샤오미 (백엔드)**: ✅ Phase 1 FastAPI 리팩토링 완료 (commit f3667bb), Phase 2 WebSocket 대기 (Claude 개발 미시작?)
+- **샤오미 (백엔드)**: ✅ Phase 1+2 완료 (FastAPI+WebSocket), Phase 3 Agent API 진행 중 (Claude 개발 미시작?)
 - **래노버 (프론트엔드)**: ✅ index.html 모던 리팩토링 완료 (commit 1b5501f)
 
 ### 블로커
