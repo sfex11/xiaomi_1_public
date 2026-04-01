@@ -1,11 +1,14 @@
 """Threads CRUD."""
 
+import asyncio
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from auth import get_current_user
 from db import get_db, new_id, now_ts, rows_to_list, owns_project, project_for_message
 from models import ThreadCreate
+from routers.ws import manager
 
 router = APIRouter(prefix="/api")
 
@@ -61,6 +64,11 @@ def create_thread(req: ThreadCreate, user_id: str = Depends(get_current_user)):
         )
         db.commit()
         row = db.execute("SELECT * FROM threads WHERE id=?", (tid,)).fetchone()
-        return json_ok(dict(row))
+        thread_data = dict(row)
+        # Find channel_id from the parent message for broadcasting
+        parent = db.execute("SELECT channel_id FROM messages WHERE id=?", (req.message_id,)).fetchone()
+        if parent:
+            asyncio.ensure_future(manager.broadcast(parent["channel_id"], "thread_created", thread_data))
+        return json_ok(thread_data)
     finally:
         db.close()

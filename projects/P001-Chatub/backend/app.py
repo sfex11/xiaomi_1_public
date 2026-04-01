@@ -17,6 +17,7 @@ from routers import messages as messages_router
 from routers import threads as threads_router
 from routers import tasks as tasks_router
 from routers import bots as bots_router
+from routers import ws as ws_router
 
 app = FastAPI(title="Chatub Backend")
 
@@ -36,6 +37,7 @@ app.include_router(messages_router.router)
 app.include_router(threads_router.router)
 app.include_router(tasks_router.router)
 app.include_router(bots_router.router)
+app.include_router(ws_router.router)
 
 
 def json_ok(data=None, status=200):

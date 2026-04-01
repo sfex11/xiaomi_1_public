@@ -1,5 +1,6 @@
 """Messages CRUD."""
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -8,6 +9,7 @@ from fastapi.responses import JSONResponse
 from auth import get_current_user
 from db import get_db, new_id, now_ts, rows_to_list, owns_project, project_for_channel
 from models import MessageCreate, MessageUpdate
+from routers.ws import manager
 
 router = APIRouter(prefix="/api")
 
@@ -80,7 +82,9 @@ def create_message(req: MessageCreate, user_id: str = Depends(get_current_user))
         )
         db.commit()
         row = db.execute("SELECT * FROM messages WHERE id=?", (mid,)).fetchone()
-        return json_ok(dict(row))
+        msg_data = dict(row)
+        asyncio.ensure_future(manager.broadcast(req.channel_id, "message_created", msg_data))
+        return json_ok(msg_data)
     finally:
         db.close()
 
@@ -100,7 +104,9 @@ def update_message(rid: str, req: MessageUpdate, user_id: str = Depends(get_curr
         db.execute("UPDATE messages SET text=?, edited_at=? WHERE id=?", (text, edited_at, rid))
         db.commit()
         row = db.execute("SELECT * FROM messages WHERE id=?", (rid,)).fetchone()
-        return json_ok(dict(row))
+        msg_data = dict(row)
+        asyncio.ensure_future(manager.broadcast(msg["channel_id"], "message_edited", msg_data))
+        return json_ok(msg_data)
     finally:
         db.close()
 
@@ -115,9 +121,11 @@ def delete_message(rid: str, user_id: str = Depends(get_current_user)):
         proj_id = project_for_channel(db, msg["channel_id"])
         if not proj_id or not owns_project(db, user_id, proj_id):
             return json_err("찾을 수 없습니다", 404)
+        channel_id = msg["channel_id"]
         db.execute("DELETE FROM threads WHERE message_id=?", (rid,))
         db.execute("DELETE FROM messages WHERE id=?", (rid,))
         db.commit()
+        asyncio.ensure_future(manager.broadcast(channel_id, "message_deleted", {"id": rid, "channel_id": channel_id}))
         return json_ok()
     finally:
         db.close()
