@@ -4,9 +4,11 @@ import json
 import urllib.request
 import urllib.error
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 
 from db import init_db, get_db, new_id, now_ts
 from auth import get_current_user
@@ -192,6 +194,16 @@ async def handle_migrate(request: Request, user_id: str = Depends(get_current_us
         raise
     finally:
         db.close()
+
+
+# -- Static file serving (index.html) --
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "src"
+
+
+@app.get("/")
+async def serve_index():
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 # -- Startup: init DB --
