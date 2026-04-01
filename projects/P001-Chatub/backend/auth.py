@@ -56,3 +56,19 @@ def get_optional_user(authorization: str = Header(default="")) -> str | None:
         token = authorization[7:].strip()
         return verify_token(token)
     return None
+
+
+def make_agent_token(bot_id: str) -> str:
+    """Generate a token specifically for an AI agent/bot."""
+    return f"agent_{bot_id}_{hmac.new(SECRET.encode(), f'agent:{bot_id}'.encode(), hashlib.sha256).hexdigest()[:32]}"
+
+
+def get_current_agent(authorization: str = Header(default="")) -> str:
+    """FastAPI dependency: authenticate an AI agent via Bearer agent_xxx token."""
+    if authorization.startswith("Bearer agent_"):
+        token = authorization[7:].strip()
+        parts = token.split("_", 1)
+        if len(parts) >= 2:
+            bot_id = parts[0]
+            return bot_id
+    raise HTTPException(status_code=401, detail="에이전트 인증이 필요합니다")
