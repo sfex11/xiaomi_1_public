@@ -1,8 +1,11 @@
 """Chatub Backend - FastAPI application assembly."""
 
 import json
+import asyncio
 import urllib.request
 import urllib.error
+
+import websockets
 
 from pathlib import Path
 
@@ -216,3 +219,33 @@ def startup():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8083)
+
+# -- WebSocket proxy to OpenClaw Gateway --
+
+from starlette.websockets import WebSocket as StarletteWebSocket, WebSocketDisconnect
+import asyncio
+
+GW_WS_URL = "ws://127.0.0.1:18789/ws"
+
+@app.websocket("/ws/gateway")
+async def gateway_ws_proxy(client_ws: StarletteWebSocket):
+    await client_ws.accept()
+    try:
+        async with websockets.connect(GW_WS_URL) as gw_ws:
+            async def client_to_gw():
+                try:
+                    while True:
+                        data = await client_ws.receive_text()
+                        await gw_ws.send(data)
+                except WebSocketDisconnect:
+                    pass
+            async def gw_to_client():
+                try:
+                    while True:
+                        data = await gw_ws.recv()
+                        await client_ws.send_text(data)
+                except Exception:
+                    pass
+            await asyncio.gather(client_to_gw(), gw_to_client())
+    except Exception as e:
+        print(f"Gateway proxy error: {e}")
