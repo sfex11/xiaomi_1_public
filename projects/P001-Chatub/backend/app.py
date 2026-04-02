@@ -1,11 +1,8 @@
 """Chatub Backend - FastAPI application assembly."""
 
 import json
-import asyncio
 import urllib.request
 import urllib.error
-
-import websockets
 
 from pathlib import Path
 
@@ -58,27 +55,27 @@ def json_err(error, status=400):
     return JSONResponse({"ok": False, "error": error}, status_code=status)
 
 
-# -- Chat proxy (SSE streaming to Gateway) --
+# -- Chat proxy (OpenAI-compatible API relay) --
+# The frontend calls the API directly from the browser.
+# This endpoint exists as a CORS proxy fallback for environments
+# where direct browser→API calls are blocked.
 
 @app.post("/api/chat")
 async def handle_chat(request: Request):
     body = await request.body()
     data = json.loads(body)
 
-    gw_url = (request.headers.get("X-Gateway-URL") or "http://127.0.0.1:18789").rstrip("/")
-    token = (
-        request.headers.get("X-Gateway-Token")
-        or "25414ae7e5899f8c81332183c34b3aecee7e1efeb92f602a"
-    )
+    api_base = (request.headers.get("X-API-Base-URL") or "https://api.openai.com/v1").rstrip("/")
+    api_key = request.headers.get("X-API-Key") or ""
     is_stream = data.get("stream", False)
 
     headers = {"Content-Type": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     try:
         req = urllib.request.Request(
-            f"{gw_url}/v1/chat/completions",
+            f"{api_base}/chat/completions",
             data=json.dumps(data).encode(),
             headers=headers,
             method="POST",
@@ -220,32 +217,3 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8083)
 
-# -- WebSocket proxy to OpenClaw Gateway --
-
-from starlette.websockets import WebSocket as StarletteWebSocket, WebSocketDisconnect
-import asyncio
-
-GW_WS_URL = "ws://127.0.0.1:18789/ws"
-
-@app.websocket("/ws/gateway")
-async def gateway_ws_proxy(client_ws: StarletteWebSocket):
-    await client_ws.accept()
-    try:
-        async with websockets.connect(GW_WS_URL) as gw_ws:
-            async def client_to_gw():
-                try:
-                    while True:
-                        data = await client_ws.receive_text()
-                        await gw_ws.send(data)
-                except WebSocketDisconnect:
-                    pass
-            async def gw_to_client():
-                try:
-                    while True:
-                        data = await gw_ws.recv()
-                        await client_ws.send_text(data)
-                except Exception:
-                    pass
-            await asyncio.gather(client_to_gw(), gw_to_client())
-    except Exception as e:
-        print(f"Gateway proxy error: {e}")
