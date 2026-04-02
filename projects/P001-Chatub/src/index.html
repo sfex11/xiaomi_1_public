@@ -2021,14 +2021,11 @@ function copyAiMsg(msgId) {
 async function callAI(bot, userText, channel) {
   const proj = getProject();
   const settings = proj.settings;
-  const apiBaseUrl = (settings.apiBaseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+  const apiBaseUrl = (settings.apiBaseUrl || '').replace(/\/+$/, '');
   const apiKey = settings.apiKey || '';
-  const model = settings.model || 'gpt-4o';
+  const model = settings.model || '';
 
-  if (!apiKey) {
-    toast('API Key가 설정되지 않았습니다. 설정에서 입력해주세요.', 'error');
-    return;
-  }
+  const useGateway = !apiKey;  // API Key 없으면 OpenClaw Gateway 사용
 
   const aiMsg = {
     id: uid(), authorId: bot.id, author: bot.name, text: '',
@@ -2050,14 +2047,24 @@ async function callAI(bot, userText, channel) {
     }
     messages.push({ role: 'user', content: userText });
 
-    const resp = await fetch(`${apiBaseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ model, messages, stream: true }),
-    });
+    let resp;
+    if (useGateway) {
+      // OpenClaw Gateway 백엔드 프록시 사용
+      resp = await fetch('/api/gateway-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages }),
+      });
+    } else {
+      resp = await fetch(`${apiBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, messages, stream: true }),
+      });
+    }
 
     if (!resp.ok) {
       const errBody = await resp.text();
@@ -2883,10 +2890,11 @@ function renderSettingsView() {
     </div>
 
     <div class="settings-section">
-      <h3>AI API 설정</h3>
-      <div class="settings-field"><label>API Base URL</label><input id="set-api-base-url" value="${escapeHtml(settings.apiBaseUrl)}" placeholder="https://api.openai.com/v1" onchange="updateApiSettings()"></div>
-      <div class="settings-field"><label>API Key</label><input id="set-api-key" type="password" value="${escapeHtml(settings.apiKey)}" placeholder="sk-..." onchange="updateApiSettings()"></div>
-      <div class="settings-field"><label>모델</label><input id="set-model" value="${escapeHtml(settings.model)}" placeholder="gpt-4o" onchange="updateApiSettings()"></div>
+      <h3>AI 설정</h3>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px;">API Key 입력 시 직접 LLM 호출, 미입력 시 OpenClaw Gateway 연결</p>
+      <div class="settings-field"><label>API Base URL <span style="color:var(--text-muted);font-size:11px;">(선택)</span></label><input id="set-api-base-url" value="${escapeHtml(settings.apiBaseUrl)}" placeholder="https://api.openai.com/v1" onchange="updateApiSettings()"></div>
+      <div class="settings-field"><label>API Key <span style="color:var(--text-muted);font-size:11px;">(선택)</span></label><input id="set-api-key" type="password" value="${escapeHtml(settings.apiKey)}" placeholder="sk-..." onchange="updateApiSettings()"></div>
+      <div class="settings-field"><label>모델 <span style="color:var(--text-muted);font-size:11px;">(선택)</span></label><input id="set-model" value="${escapeHtml(settings.model)}" placeholder="gpt-4o" onchange="updateApiSettings()"></div>
       <div class="settings-field"><label>컨텍스트 길이 (최근 N개 메시지)</label><input id="set-ctx-len" type="number" value="${settings.contextLength}" min="1" max="50" onchange="updateApiSettings()"></div>
     </div>
 
