@@ -1,11 +1,8 @@
 """Chatub Backend - FastAPI application assembly."""
 
 import json
-import asyncio
 import urllib.request
 import urllib.error
-
-import websockets
 
 from pathlib import Path
 
@@ -116,91 +113,66 @@ async def handle_chat(request: Request):
         return JSONResponse(content={"error": str(e)}, status_code=502)
 
 
-# -- OpenClaw Gateway chat proxy --
+# -- OpenClaw Gateway chat proxy (HTTP /v1/chat/completions) --
 
-GW_WS_URL = "ws://127.0.0.1:18789/ws"
+import os
 
-async def _gw_connect():
-    """Connect to Gateway WebSocket, return (ws, req_fn)."""
-    ws = await websockets.connect(GW_WS_URL)
-    await ws.recv()  # challenge
-    await ws.send(json.dumps({
-        "type": "req", "id": "c", "method": "connect",
-        "params": {
-            "minProtocol": 3, "maxProtocol": 3,
-            "client": {"id": "cli", "version": "1.0", "platform": "linux", "mode": "cli"},
-            "role": "operator", "scopes": ["operator.read", "operator.write"]
-        }
-    }))
-    resp = json.loads(await ws.recv())
-    if not resp.get("ok"):
-        await ws.close()
-        raise Exception(f"Gateway connect failed: {resp.get('error',{})}")
-    return ws
-
-async def _gw_chat_send(messages):
-    """Send messages to Gateway chat.send, yield SSE deltas."""
-    ws = await _gw_connect()
-    # Build prompt from OpenAI messages
-    prompt = "\n".join(
-        f"{'assistant' if m['role']=='assistant' else m['role']}: {m['content']}"
-        for m in messages
-    )
-    # Strip system prefix for cleaner output
-    prompt = prompt.replace("system:", "").strip()
-
-    try:
-        # Subscribe
-        await ws.send(json.dumps({"type": "req", "id": "sub", "method": "chat.subscribe", "params": {}}))
-        # Send
-        await ws.send(json.dumps({"type": "req", "id": "msg", "method": "chat.send", "params": {"message": prompt}}))
-
-        full_text = ""
-        while True:
-            try:
-                resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=120))
-            except asyncio.TimeoutError:
-                break
-
-            if resp.get("type") == "event" and resp.get("event") == "chat":
-                state = resp.get("payload", {}).get("state", "")
-                if state == "delta":
-                    msg = resp.get("payload", {}).get("message", {})
-                    text = ""
-                    if isinstance(msg, dict):
-                        for c in msg.get("content", []):
-                            if isinstance(c, dict) and c.get("text"):
-                                text += c["text"]
-                    if text:
-                        full_text += text
-                        # SSE format
-                        chunk = {"choices": [{"delta": {"content": text}, "index": 0}]}
-                        yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-                elif state in ("final", "error", "aborted"):
-                    break
-            elif resp.get("type") == "event":
-                continue  # ignore health/tick events
-    finally:
-        await ws.close()
-
-    yield "data: [DONE]\n\n"
+GW_BASE_URL = os.getenv("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789")
+GW_TOKEN = os.getenv("OPENCLAW_GATEWAY_TOKEN", "")
 
 
 @app.post("/api/gateway-chat")
 async def handle_gateway_chat(request: Request):
-    """Proxy chat to OpenClaw Gateway, return SSE stream (OpenAI-compatible)."""
+    """Proxy chat to OpenClaw Gateway /v1/chat/completions, return SSE stream."""
     body = await request.body()
     data = json.loads(body)
-    messages = data.get("messages", [])
 
-    if not messages:
-        return JSONResponse(content={"error": "No messages"}, status_code=400)
+    headers = {"Content-Type": "application/json"}
+    if GW_TOKEN:
+        headers["Authorization"] = f"Bearer {GW_TOKEN}"
 
-    return StreamingResponse(
-        _gw_chat_send(messages),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
-    )
+    is_stream = data.get("stream", True)
+    if is_stream:
+        data["stream"] = True
+
+    try:
+        req = urllib.request.Request(
+            f"{GW_BASE_URL}/v1/chat/completions",
+            data=json.dumps(data).encode(),
+            headers=headers,
+            method="POST",
+        )
+        resp = urllib.request.urlopen(req, timeout=120)
+
+        if is_stream:
+            def generate():
+                while True:
+                    chunk = resp.read(1024)
+                    if not chunk:
+                        break
+                    yield chunk
+
+            return StreamingResponse(
+                generate(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+            )
+        else:
+            result = resp.read()
+            return JSONResponse(
+                content=json.loads(result),
+                headers={"Cache-Control": "no-cache"},
+            )
+
+    except urllib.error.HTTPError as e:
+        error_body = e.read()
+        try:
+            error_json = json.loads(error_body)
+        except Exception:
+            error_json = {"error": error_body.decode(errors="replace")}
+        return JSONResponse(content=error_json, status_code=e.code)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=502)
 
 
 # -- Migration (localStorage -> DB) --
