@@ -120,37 +120,53 @@ import os
 GW_BASE_URL = os.getenv("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789")
 GW_TOKEN = os.getenv("OPENCLAW_GATEWAY_TOKEN", "")
 
+import logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [chat-proxy] %(message)s")
+log = logging.getLogger("gateway-chat")
+
 
 @app.post("/api/gateway-chat")
 async def handle_gateway_chat(request: Request):
     """Proxy chat to OpenClaw Gateway /v1/chat/completions, return SSE stream."""
     body = await request.body()
     data = json.loads(body)
+    log.info("▶ request received: messages=%d", len(data.get("messages", [])))
 
     headers = {"Content-Type": "application/json"}
     if GW_TOKEN:
         headers["Authorization"] = f"Bearer {GW_TOKEN}"
+        log.info("▶ using token: ...%s", GW_TOKEN[-6:])
+    else:
+        log.info("▶ no token configured")
 
     is_stream = data.get("stream", True)
     if is_stream:
         data["stream"] = True
 
+    target = f"{GW_BASE_URL}/v1/chat/completions"
+    log.info("▶ proxying to %s (stream=%s)", target, is_stream)
+
     try:
         req = urllib.request.Request(
-            f"{GW_BASE_URL}/v1/chat/completions",
+            target,
             data=json.dumps(data).encode(),
             headers=headers,
             method="POST",
         )
         resp = urllib.request.urlopen(req, timeout=120)
+        log.info("▶ Gateway response: status=%d", resp.status)
 
         if is_stream:
             def generate():
+                total_bytes = 0
                 while True:
                     chunk = resp.read(1024)
                     if not chunk:
                         break
+                    total_bytes += len(chunk)
+                    log.info("▶ chunk: %d bytes (total: %d)", len(chunk), total_bytes)
                     yield chunk
+                log.info("▶ stream complete: %d total bytes", total_bytes)
 
             return StreamingResponse(
                 generate(),
@@ -159,12 +175,14 @@ async def handle_gateway_chat(request: Request):
             )
         else:
             result = resp.read()
+            log.info("▶ Gateway response body: %s", result[:500])
             return JSONResponse(
                 content=json.loads(result),
                 headers={"Cache-Control": "no-cache"},
             )
 
     except urllib.error.HTTPError as e:
+        log.error("▶ HTTP error: %d %s", e.code, e.read()[:500])
         error_body = e.read()
         try:
             error_json = json.loads(error_body)
@@ -172,6 +190,7 @@ async def handle_gateway_chat(request: Request):
             error_json = {"error": error_body.decode(errors="replace")}
         return JSONResponse(content=error_json, status_code=e.code)
     except Exception as e:
+        log.error("▶ Exception: %s", str(e))
         return JSONResponse(content={"error": str(e)}, status_code=502)
 
 

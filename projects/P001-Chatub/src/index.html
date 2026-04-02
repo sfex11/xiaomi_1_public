@@ -2042,14 +2042,17 @@ async function callAI(bot, userText, channel) {
     messages.push({ role: 'user', content: userText });
 
     let resp;
+    console.log('[Chatub] callAI: sending', messages.length, 'messages to /api/gateway-chat');
     resp = await fetch('/api/gateway-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages }),
     });
+    console.log('[Chatub] callAI: response status', resp.status);
 
     if (!resp.ok) {
       const errBody = await resp.text();
+      console.error('[Chatub] callAI: error', resp.status, errBody);
       let errMsg;
       try { errMsg = JSON.parse(errBody).error?.message || errBody; } catch { errMsg = errBody; }
       throw new Error(`API ${resp.status}: ${errMsg}`);
