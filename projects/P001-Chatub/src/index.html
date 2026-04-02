@@ -1337,7 +1337,7 @@ function loadState() {
         if (raw) {
           const proj = JSON.parse(raw);
           if (!proj.milestones) proj.milestones = [];
-          if (!proj.settings) proj.settings = { gatewayUrl: '', gatewayToken: '', contextLength: 20 };
+          if (!proj.settings) proj.settings = { gatewayUrl: '', gatewayWsUrl: '', gatewayToken: '', contextLength: 20 };
           state.projects.push(proj);
         }
       });
@@ -1348,7 +1348,7 @@ function loadState() {
         state = JSON.parse(raw);
         state.projects.forEach(p => {
           if (!p.milestones) p.milestones = [];
-          if (!p.settings) p.settings = { gatewayUrl: '', gatewayToken: '', contextLength: 20 };
+          if (!p.settings) p.settings = { gatewayUrl: '', gatewayWsUrl: '', gatewayToken: '', contextLength: 20 };
         });
         // Save in new per-project format and remove old key
         saveState();
@@ -1428,7 +1428,7 @@ function createProject(name, desc, color) {
     bots: DEFAULT_BOTS.map(b => ({...b})),
     tasks: [],
     milestones: [],
-    settings: { gatewayUrl: '', gatewayToken: '', contextLength: 20 },
+    settings: { gatewayUrl: '', gatewayWsUrl: '', gatewayToken: '', contextLength: 20 },
     nextTaskId: 1,
   };
   state.projects.push(proj);
@@ -2016,103 +2016,188 @@ function copyAiMsg(msgId) {
 // AI INTEGRATION
 // ================================================================
 
+// ===== OpenClaw Gateway WebSocket Client =====
+let _gwWs = null;
+let _gwConnected = false;
+let _gwPending = {};
+let _gwDeviceId = null;
+let _gwKeyPair = null;
+let _gwPubKeyRaw = null;
+let _gwReqId = 0;
+
+function _gwNextId() { return 'gw-' + (++_gwReqId); }
+
+async function _gwInitDevice() {
+  const stored = localStorage.getItem('chatub_device');
+  if (stored) {
+    try {
+      const d = JSON.parse(stored);
+      _gwDeviceId = d.deviceId;
+      _gwPubKeyRaw = d.publicKeyRaw;
+      _gwKeyPair = {
+        privateKey: await crypto.subtle.importKey('jwk', d.jwkPrivate, { name: 'Ed25519' }, true, ['sign']),
+        publicKey: await crypto.subtle.importKey('jwk', d.jwkPublic, { name: 'Ed25519' }, true, ['verify']),
+      };
+      return;
+    } catch(e) {}
+  }
+  const kp = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+  const spki = await crypto.subtle.exportKey('spki', kp.publicKey);
+  const raw = spki.slice(12);
+  const bytes = new Uint8Array(raw);
+  let b64 = ''; for (const b of bytes) b64 += String.fromCharCode(b);
+  _gwPubKeyRaw = btoa(b64).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const hash = await crypto.subtle.digest('SHA-256', raw);
+  _gwDeviceId = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  _gwKeyPair = kp;
+  const jwkPub = await crypto.subtle.exportKey('jwk', kp.publicKey);
+  const jwkPriv = await crypto.subtle.exportKey('jwk', kp.privateKey);
+  localStorage.setItem('chatub_device', JSON.stringify({ deviceId: _gwDeviceId, publicKeyRaw: _gwPubKeyRaw, jwkPublic: jwkPub, jwkPrivate: jwkPriv, version: 1 }));
+}
+
+function _gwBufToB64(buf) {
+  const bytes = new Uint8Array(buf);
+  let b = ''; for (const v of bytes) b += String.fromCharCode(v);
+  return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function _gwBuildPayload(deviceId, clientId, clientMode, role, scopes, signedAtMs, token, nonce) {
+  const parts = [nonce ? 'v2' : 'v1', deviceId, clientId, clientMode, role, scopes.join(','), String(signedAtMs), token || ''];
+  if (nonce) parts.push(nonce);
+  return parts.join('|');
+}
+
+async function _gwSign(payload) {
+  const sig = await crypto.subtle.sign('Ed25519', _gwKeyPair.privateKey, new TextEncoder().encode(payload));
+  return _gwBufToB64(sig);
+}
+
+function _gwSend(method, params) {
+  return new Promise((resolve, reject) => {
+    if (!_gwWs || _gwWs.readyState !== WebSocket.OPEN) return reject(new Error('Gateway not connected'));
+    const id = _gwNextId();
+    _gwPending[id] = { resolve, reject };
+    _gwWs.send(JSON.stringify({ type: 'req', id, method, params }));
+    setTimeout(() => { if (_gwPending[id]) { delete _gwPending[id]; reject(new Error('timeout')); } }, 120000);
+  });
+}
+
+async function _gwConnect(wsUrl, token) {
+  if (_gwWs) _gwWs.close();
+  if (!_gwKeyPair) await _gwInitDevice();
+
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl);
+    _gwWs = ws;
+
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'event' && msg.event === 'connect.challenge') {
+        const nonce = msg.payload?.nonce;
+        const ts = msg.payload?.ts || Date.now();
+        const payload = _gwBuildPayload(_gwDeviceId, 'webchat', 'webchat', 'operator',
+          ['operator.read', 'operator.write'], ts, token, nonce);
+        _gwSign(payload).then(sig => {
+          ws.send(JSON.stringify({
+            type: 'req', id: _gwNextId(), method: 'connect',
+            params: {
+              minProtocol: 3, maxProtocol: 3,
+              client: { id: 'webchat', version: '1.0.0', platform: 'web', mode: 'webchat' },
+              role: 'operator', scopes: ['operator.read', 'operator.write'],
+              auth: { token }, device: { id: _gwDeviceId, publicKey: _gwPubKeyRaw, signature: sig, signedAt: ts, nonce },
+              userAgent: 'chatub/1.0.0'
+            }
+          }));
+        });
+      } else if (msg.type === 'res' && msg.id) {
+        if (msg.id in _gwPending) {
+          const p = _gwPending[msg.id]; delete _gwPending[msg.id];
+          if (msg.ok) p.resolve(msg.payload); else p.reject(msg.error || msg.payload);
+        }
+        if (!_gwConnected && msg.ok) { _gwConnected = true; resolve(); }
+        if (!_gwConnected && !msg.ok) { reject(msg.error); ws.close(); }
+      }
+    };
+
+    ws.onerror = () => reject(new Error('WS error'));
+    ws.onclose = () => { _gwConnected = false; };
+  });
+}
+
 async function callAI(bot, userText, channel) {
   const proj = getProject();
   const settings = proj.settings;
 
-  // Create placeholder message
   const aiMsg = {
-    id: uid(),
-    authorId: bot.id,
-    author: bot.name,
-    text: '',
-    ts: Date.now(),
-    isBot: true,
-    streaming: true,
-    reactions: {},
-    replies: [],
+    id: uid(), authorId: bot.id, author: bot.name, text: '',
+    ts: Date.now(), isBot: true, streaming: true, reactions: {}, replies: [],
   };
   channel.messages.push(aiMsg);
   renderMessages();
   showTypingIndicator(bot.name);
 
-  // Build context
-  const contextLen = settings.contextLength || 20;
-  const recentMsgs = channel.messages.slice(-contextLen - 1, -1);
-  const messages = [
-    {
-      role: 'system',
-      content: `${bot.systemPrompt}\n\n프로젝트: ${proj.name}\n설명: ${proj.desc || ''}`
-    },
-    ...recentMsgs.map(m => ({
-      role: m.isBot ? 'assistant' : 'user',
-      content: `${m.author}: ${m.text}`
-    }))
-  ];
-
-  const useProxy = !settings.gatewayUrl;
-  const gatewayUrl = settings.gatewayUrl || '';
-  const model = settings.gatewayUrl ? `openclaw/${bot.id}` : 'default';
+  const gatewayWsUrl = settings.gatewayWsUrl || 'ws://127.0.0.1:18789/ws';
+  const token = settings.gatewayToken || '';
 
   try {
-    const apiUrl = useProxy ? '/api/chat' : (gatewayUrl.replace(/\/+$/, '')) + '/v1/chat/completions';
-    const headers = { 'Content-Type': 'application/json' };
-    if (settings.gatewayToken) headers['Authorization'] = 'Bearer ' + settings.gatewayToken;
-    if (useProxy) headers['X-Gateway-URL'] = 'http://127.0.0.1:18789';
+    if (!_gwConnected) {
+      await _gwConnect(gatewayWsUrl, token);
+    }
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: true,
-      }),
+    // Build conversation context
+    const contextLen = settings.contextLength || 20;
+    const recentMsgs = channel.messages.slice(-contextLen - 1, -1);
+    const context = [
+      `${bot.systemPrompt}\n\n프로젝트: ${proj.name}\n설명: ${proj.desc || ''}`,
+      ...recentMsgs.map(m => `${m.isBot ? bot.name : m.author}: ${m.text}`)
+    ].join('\n');
+    const prompt = `${context}\n\n${bot.name}:`;
+
+    // Subscribe to chat events for this session
+    const subId = _gwNextId();
+    _gwWs.send(JSON.stringify({ type: 'req', id: subId, method: 'chat.subscribe', params: {} }));
+
+    // Send message
+    const res = await _gwSend('chat.send', { message: prompt });
+
+    // Listen for streaming response
+    await new Promise((resolveStream) => {
+      const handler = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'event' && msg.event === 'chat') {
+          const payload = msg.payload || {};
+          const state = payload.state;
+          if (state === 'delta') {
+            const text = payload.message?.content?.[0]?.text || payload.message?.content || '';
+            if (text) {
+              aiMsg.text += text;
+              updateStreamingMessage(aiMsg);
+            }
+          } else if (state === 'final' || state === 'error' || state === 'aborted') {
+            _gwWs.removeEventListener('message', handler);
+            if (state === 'error') {
+              aiMsg.text = aiMsg.text || `[오류: ${payload.errorMessage || 'Unknown'}]`;
+            }
+            resolveStream();
+          }
+        }
+      };
+      _gwWs.addEventListener('message', handler);
+      setTimeout(resolveStream, 60000);
     });
 
-    if (!response.ok) {
-      throw new Error(`Gateway error: ${response.status}`);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') break;
-        try {
-          const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta?.content;
-          if (delta) {
-            aiMsg.text += delta;
-            updateStreamingMessage(aiMsg);
-          }
-        } catch(e) { /* ignore parse errors */ }
-      }
-    }
   } catch(e) {
-    aiMsg.text = aiMsg.text || `[오류: ${e.message}]`;
+    _gwConnected = false;
+    aiMsg.text = aiMsg.text || `[오류: ${e.message || 'Gateway 연결 실패'}]`;
   }
 
   aiMsg.streaming = false;
   hideTypingIndicator();
-
   const currentProj = getProject();
   if (currentProj && currentProj.currentChannel !== channel.id) {
     channel.unread = (channel.unread || 0) + 1;
     renderChannelList();
   }
-
   saveState();
   renderMessages();
 }
@@ -2892,7 +2977,8 @@ function renderSettingsView() {
 
     <div class="settings-section">
       <h3>Gateway 연동</h3>
-      <div class="settings-field"><label>Gateway URL</label><input id="set-gw-url" value="${escapeHtml(settings.gatewayUrl)}" placeholder="http://127.0.0.1:18789" onchange="updateGatewaySettings()"></div>
+      <div class="settings-field"><label>Gateway URL (HTTP)</label><input id="set-gw-url" value="${escapeHtml(settings.gatewayUrl)}" placeholder="http://127.0.0.1:18789" onchange="updateGatewaySettings()"></div>
+      <div class="settings-field"><label>Gateway WebSocket URL</label><input id="set-gw-ws-url" value="${escapeHtml(settings.gatewayWsUrl)}" placeholder="ws://127.0.0.1:18789/ws" onchange="updateGatewaySettings()"></div>
       <div class="settings-field"><label>Token</label><input id="set-gw-token" type="password" value="${escapeHtml(settings.gatewayToken)}" placeholder="API Token" onchange="updateGatewaySettings()"></div>
       <div class="settings-field"><label>컨텍스트 길이 (최근 N개 메시지)</label><input id="set-ctx-len" type="number" value="${settings.contextLength}" min="1" max="50" onchange="updateGatewaySettings()"></div>
     </div>
@@ -2948,6 +3034,7 @@ function updateProjectSettings() {
 function updateGatewaySettings() {
   const proj = getProject();
   proj.settings.gatewayUrl = $('set-gw-url').value.trim();
+  proj.settings.gatewayWsUrl = $('set-gw-ws-url').value.trim();
   proj.settings.gatewayToken = $('set-gw-token').value.trim();
   proj.settings.contextLength = parseInt($('set-ctx-len').value) || 20;
   if (!isGuestMode) API.updateSettings({
@@ -2956,6 +3043,10 @@ function updateGatewaySettings() {
     context_length: proj.settings.contextLength,
   });
   saveState();
+  // Reset gateway connection with new settings
+  _gwConnected = false;
+  if (_gwWs) _gwWs.close();
+  toast('Gateway 설정이 업데이트되었습니다', 'success');
 }
 
 function confirmDeleteProject() {
