@@ -5,6 +5,9 @@ timezone: Asia/Seoul
 markdown: kramdown
 kramdown:
   input: GFM
+keep_files:
+  - projects
+
 defaults:
   - scope:
       path: ""
