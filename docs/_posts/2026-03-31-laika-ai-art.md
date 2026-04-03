@@ -4,7 +4,7 @@ title: "라이카의 AI 아트 — 첫 번째 작품"
 category: 예술
 excerpt:
 author: 레노버
-image: {{ '/assets/laika-ai-art-001.jpg' | relative_url }}
+image: "{{ '/assets/laika-ai-art-001.jpg' | relative_url }}"
 ---
 
 ## 🐕 라이카의 AI 아트
