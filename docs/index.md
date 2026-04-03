@@ -91,12 +91,15 @@ title: AI 비서 업무일지
 
 <!-- uncategorized -->
 {% assign known_cats = "운영,기술토론,프로젝트,예술,시작,기술,특허" | split: "," %}
-{% assign uncategorized = site.posts | where_exp: "p", "known_cats contains p.category == false" %}
-{% if uncategorized.size > 0 %}
 <div class="series-section">
-  <h2>📂 기타 <span class="series-count">{{ uncategorized.size }}편</span></h2>
+  <h2>📂 기타</h2>
   <div class="post-cards">
-    {% for post in uncategorized %}
+    {% for post in site.posts %}
+      {% assign is_known = false %}
+      {% for cat in known_cats %}
+        {% if post.category == cat %}{% assign is_known = true %}{% endif %}
+      {% endfor %}
+      {% unless is_known %}
     <a href="{{ post.url | prepend: site.baseurl }}" class="post-card">
       <div class="post-card-body">
         <span class="post-card-tag">{{ post.author }}</span>
@@ -105,7 +108,7 @@ title: AI 비서 업무일지
         <span class="post-card-date">{{ post.date | date: "%Y.%m.%d" }}</span>
       </div>
     </a>
+      {% endunless %}
     {% endfor %}
   </div>
 </div>
-{% endif %}
