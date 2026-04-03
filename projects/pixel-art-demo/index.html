@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🎮 Pixel Art Scenes - 에이전트 팀 픽셀아트 프로젝트</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f1a;color:#e0e7ff;font-family:'Segoe UI',system-ui,sans-serif;line-height:1.6}
+.container{max-width:900px;margin:0 auto;padding:20px}
+h1{text-align:center;font-size:2em;margin:20px 0 10px;color:#818cf8}
+h1 span{color:#fbbf24}
+.subtitle{text-align:center;color:#6b7280;margin-bottom:30px;font-size:0.9em}
+.scene-section{background:#1e1e30;border:2px solid #333;border-radius:12px;margin:20px 0;padding:20px;overflow:hidden}
+.scene-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.scene-title{font-size:1.3em;color:#c084fc;font-weight:bold}
+.scene-badge{background:#312e81;color:#818cf8;font-size:0.75em;padding:4px 10px;border-radius:20px}
+.scene-desc{color:#9ca3af;font-size:0.9em;margin-bottom:15px}
+.canvas-wrap{position:relative;width:100%;aspect-ratio:4/3;background:#111;border-radius:8px;overflow:hidden;border:2px solid #333}
+.canvas-wrap iframe{width:100%;height:100%;border:none}
+.assets-used{margin-top:12px;padding:10px;background:rgba(99,102,241,0.1);border-radius:6px;font-size:0.8em;color:#818cf8}
+.assets-used strong{color:#a5b4fc}
+.nav-bar{position:sticky;top:0;background:rgba(15,15,26,0.95);backdrop-filter:blur(10px);padding:10px 20px;border-bottom:1px solid #333;display:flex;gap:15px;justify-content:center;z-index:10}
+.nav-btn{background:#312e81;color:#c7d2fe;border:1px solid #4338ca;padding:8px 16px;border-radius:6px;cursor:pointer;text-decoration:none;font-size:0.85em;transition:all 0.2s}
+.nav-btn:hover{background:#4338ca;color:#fff}
+.nav-btn.active{background:#6366f1;color:#fff}
+.footer{text-align:center;padding:30px;color:#4b5563;font-size:0.8em;border-top:1px solid #1e1e30;margin-top:30px}
+.tag{display:inline-block;background:#374151;color:#9ca3af;padding:2px 8px;border-radius:4px;font-size:0.75em;margin:2px}
+</style></head><body>
+<nav class="nav-bar">
+<a class="nav-btn active" href="#scene1">🏠 던전 오피스</a>
+<a class="nav-btn" href="#scene2">🍺 여관 채팅방</a>
+<a class="nav-btn" href="#scene3">⚔️ 캐릭터 선택</a>
+<a class="nav-btn" href="#about">ℹ️ 소개</a>
+</nav>
+
+<div class="container">
+<h1>🎮 에이전트 팀 <span>Pixel Art</span> 프로젝트</h1>
+<p class="subtitle">무료 CC0 에셋으로 만든 3가지 픽셀아트 게임 화면 — DeskRPG 영감</p>
+
+<div class="scene-section" id="scene1">
+<div class="scene-header">
+<div class="scene-title">🏠 Scene 1: 던전 오피스</div>
+<span class="scene-badge">Kenney Tiny Dungeon</span>
+</div>
+<p class="scene-desc">던전을 개조한 에이전트 협업 공간. 레노버·라이카·샤오미가 각자의 책상에서 업무 중!</p>
+<div class="canvas-wrap">
+<iframe src="scene1-dungeon-office.html" loading="lazy"></iframe>
+</div>
+<div class="assets-used">
+<strong>🎨 사용 에셋:</strong> Kenney Tiny Dungeon (CC0) — 132개 타일 (16×16px)<br>
+<span class="tag">바닥</span><span class="tag">벽</span><span class="tag">가구</span><span class="tag">NPC</span><span class="tag">횃불</span><span class="tag">서고</span>
+</div>
+</div>
+
+<div class="scene-section" id="scene2">
+<div class="scene-header">
+<div class="scene-title">🍺 Scene 2: 여관 채팅방</div>
+<span class="scene-badge">Tiny Dungeon + Indoor Pack</span>
+</div>
+<p class="scene-desc">중세 RPG 여관에서 열리는 실시간 채팅. 바 카운터, 벽난로, 원탁에서의 대화!</p>
+<div class="canvas-wrap">
+<iframe src="scene2-chat-tavern.html" loading="lazy"></iframe>
+</div>
+<div class="assets-used">
+<strong>🎨 사용 에셋:</strong> Kenney Tiny Dungeon + Roguelike Indoor Pack (CC0)<br>
+<span class="tag">나무 바닥</span><span class="tag">벽난로</span><span class="tag">바 카운터</span><span class="tag">의자</span><span class="tag">테이블</span><span class="tag">촛불</span>
+</div>
+</div>
+
+<div class="scene-section" id="scene3">
+<div class="scene-header">
+<div class="scene-title">⚔️ Scene 3: 캐릭터 선택</div>
+<span class="scene-badge">HTML/CSS + Pixel Art</span>
+</div>
+<p class="scene-desc">별이 빛나는 밤하늘 아래, 4명의 캐릭터 중 선택하세요! HP/MP 스탯 표시.</p>
+<div class="canvas-wrap">
+<iframe src="scene3-character-select.html" loading="lazy"></iframe>
+</div>
+<div class="assets-used">
+<strong>🎨 사용 에셋:</strong> Kenney Tiny Dungeon (CC0) + Custom HTML/CSS UI<br>
+<span class="tag">별배경</span><span class="tag">캐릭터 카드</span><span class="tag">스탯 바</span><span class="tag">인터랙티브</span>
+</div>
+</div>
+
+<div class="scene-section" id="about">
+<div class="scene-header">
+<div class="scene-title">📖 프로젝트 소개</div>
+</div>
+<p class="scene-desc">이 프로젝트는 <a href="https://github.com/dandacompany/deskrpg" style="color:#818cf8">DeskRPG</a>에서 영감을 받아, 무료 CC0 픽셀아트 에셋만으로 게임 화면을 구성하는 실험입니다.</p>
+<h3 style="margin:15px 0 10px;color:#a5b4fc">🔧 사용 도구 & 에셋</h3>
+<ul style="padding-left:20px;color:#9ca3af">
+<li><strong style="color:#c084fc">Kenney Tiny Dungeon</strong> — 132개 던전 타일 (CC0)</li>
+<li><strong style="color:#c084fc">Kenney Tiny Town</strong> — 132개 마을/건물 타일 (CC0)</li>
+<li><strong style="color:#c084fc">Roguelike Indoor Pack</strong> — 실내 가구/장식 타일 (CC0)</li>
+<li><strong style="color:#c084fc">Kenney Roguelike RPG Pack</strong> — RPG 캐릭터/오브젝트 (CC0)</li>
+</ul>
+<h3 style="margin:15px 0 10px;color:#a5b4fc">🖼️ 더 많은 무료 리소스</h3>
+<ul style="padding-left:20px;color:#9ca3af">
+<li><a href="https://kenney.nl/assets" style="color:#818cf8">kenney.nl/assets</a> — 1000+ 무료 에셋</li>
+<li><a href="https://itch.io/game-assets/free/tag-pixel-art" style="color:#818cf8">itch.io Pixel Art</a> — 인디 에셋</li>
+<li><a href="https://opengameart.org" style="color:#818cf8">OpenGameArt.org</a> — 게임 에셋 위키</li>
+<li><a href="https://craftpix.net" style="color:#818cf8">CraftPix.net</a> — RPG 전문 에셋</li>
+</ul>
+<h3 style="margin:15px 0 10px;color:#a5b4fc">💡 기술 스택</h3>
+<ul style="padding-left:20px;color:#9ca3af">
+<li>HTML5 Canvas API — 타일맵 렌더링</li>
+<li>CSS image-rendering: pixelated — 픽셀 선명 유지</li>
+<li>3배 업스케일링 (320×240 → 960×720)</li>
+<li>모든 파일 CC0 라이선스 — 상업적 이용 가능</li>
+</ul>
+</div>
+</div>
+
+<div class="footer">
+<p>🎮 에이전트 팀 Pixel Art Demo · CC0 에셋 사용</p>
+<p>영감: <a href="https://github.com/dandacompany/deskrpg" style="color:#818cf8">DeskRPG</a> · 에셋: <a href="https://kenney.nl" style="color:#818cf8">Kenney</a></p>
+</div>
+</body></html>
