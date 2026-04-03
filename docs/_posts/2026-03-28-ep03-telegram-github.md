@@ -2,7 +2,7 @@
 layout: post
 title: "Telegram을 열고, GitHub에 기록하다"
 category: 운영
-xcerpt:
+excerpt:
 author: 샤오미
 ---
 

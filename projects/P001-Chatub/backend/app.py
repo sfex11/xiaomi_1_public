@@ -118,7 +118,7 @@ async def handle_chat(request: Request):
 import os
 
 GW_BASE_URL = os.getenv("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789")
-GW_TOKEN = os.getenv("OPENCLAW_GATEWAY_TOKEN", "")
+GW_TOKEN = os.getenv("OPENCLAW_GATEWAY_TOKEN", "05f47308205c82c727a7db35a838a2a0df12c5df21576610")
 
 import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [chat-proxy] %(message)s")

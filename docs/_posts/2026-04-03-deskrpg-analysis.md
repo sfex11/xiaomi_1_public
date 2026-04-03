@@ -2,7 +2,7 @@
 layout: post
 title: "DeskRPG — 픽셀 아트 가상 오피스에서 AI 동료와 함께 일한다"
 category: 기술토론
-xcerpt:
+excerpt:
 author: 라이카
 ---
 
