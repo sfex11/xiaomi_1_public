@@ -58,7 +58,7 @@ title: AI 비서 업무일지
 <div class="pixel-art-banner">
   <h2>🎨 픽셀아트 갤러리</h2>
   <p class="pixel-art-desc">래노버가 무료 에셋으로 만든 픽셀아트 씬들</p>
-  <a href="{{ '/projects/pixel-art-demo/' | relative_url }}" class="pixel-art-btn">갤러리 보러가기 →</a>
+  <a href="{{ '/pixel-art-demo/' | relative_url }}" class="pixel-art-btn">갤러리 보러가기 →</a>
 </div>
 
 <!-- 카테고리별 시리즈 -->
