@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Scene 3 - Character Select</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0f0f1a;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:monospace}
+.scene{position:relative;width:960px;height:720px}
+canvas{width:960px;height:720px;image-rendering:pixelated;border:4px solid #6366f1;border-radius:4px}
+.overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:auto}
+.title-bar{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#312e81,#4338ca);color:#e0e7ff;font-size:20px;padding:8px 24px;border:2px solid #818cf8;border-radius:6px;text-align:center;letter-spacing:2px}
+.char-card{position:absolute;width:190px;height:260px;border:3px solid #444;border-radius:8px;background:rgba(0,0,0,0.5);cursor:pointer;transition:all 0.2s}
+.char-card:hover{border-color:#ffd700;transform:scale(1.03);box-shadow:0 0 20px rgba(255,215,0,0.3)}
+.char-card.selected{border-color:#ffd700;box-shadow:0 0 25px rgba(255,215,0,0.5)}
+.char-frame{width:160px;height:160px;margin:10px auto 0;background:rgba(30,30,50,0.8);border:2px solid #555;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:64px}
+.char-info{text-align:center;padding:8px;color:#ccc}
+.char-name{font-size:16px;font-weight:bold;margin-bottom:4px}
+.char-role{font-size:11px;color:#888}
+.char-emoji{font-size:48px}
+.btn-select{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font-size:16px;padding:10px 40px;border:2px solid #fca5a5;border-radius:6px;cursor:pointer;font-family:monospace;letter-spacing:3px}
+.btn-select:hover{background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 0 15px rgba(239,68,68,0.5)}
+.hint{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);color:#666;font-size:11px}
+.cards{position:absolute;top:60px;left:0;width:100%;height:calc(100% - 140px);display:flex;justify-content:center;align-items:center;gap:20px}
+.star-bg{position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden}
+.star{position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;animation:twinkle 2s infinite}
+@keyframes twinkle{0%,100%{opacity:0.2}50%{opacity:1}}
+</style></head><body>
+<div class="scene">
+<canvas id="c" width="320" height="240"></canvas>
+<div class="overlay">
+<div class="star-bg" id="stars"></div>
+<div class="title-bar">⚔️ 캐릭터 선택 ⚔️</div>
+<div class="cards">
+<div class="char-card" onclick="select(this)" data-name="레노버">
+<div class="char-frame">👼</div>
+<div class="char-info">
+<div class="char-name" style="color:#c084fc">레노버</div>
+<div class="char-role">천사 비서 · UI/UX 담당</div>
+<div style="margin-top:6px;font-size:10px;color:#6b7280">HP ██████████ MP ████████░░</div>
+</div>
+</div>
+<div class="char-card" onclick="select(this)" data-name="라이카">
+<div class="char-frame">🐕</div>
+<div class="char-info">
+<div class="char-name" style="color:#fb923c">라이카</div>
+<div class="char-role">강아지 PM · 통합/테스트</div>
+<div style="margin-top:6px;font-size:10px;color:#6b7280">HP █████████░ MP ██████░░░░</div>
+</div>
+</div>
+<div class="char-card" onclick="select(this)" data-name="샤오미">
+<div class="char-frame">🤖</div>
+<div class="char-info">
+<div class="char-name" style="color:#60a5fa">샤오미</div>
+<div class="char-role">로봇 개발자 · 백엔드</div>
+<div style="margin-top:6px;font-size:10px;color:#6b7280">HP ██████████ MP ██████████</div>
+</div>
+</div>
+<div class="char-card" onclick="select(this)" data-name="회장님">
+<div class="char-frame">👑</div>
+<div class="char-info">
+<div class="char-name" style="color:#fbbf24">회장님</div>
+<div class="char-role">리더 · 프로젝트 오너</div>
+<div style="margin-top:6px;font-size:10px;color:#6b7280">HP ██████████ MP ██████████</div>
+</div>
+</div>
+</div>
+<div class="hint">캐릭터를 클릭하여 선택하세요</div>
+<div class="btn-select" id="btnSelect">▶ 선택 완료</div>
+</div>
+</div>
+<script>
+// Background stars
+const stars=document.getElementById('stars');
+for(let i=0;i<60;i++){
+const s=document.createElement('div');s.className='star';
+s.style.left=Math.random()*100+'%';s.style.top=Math.random()*100+'%';
+s.style.animationDelay=Math.random()*2+'s';s.style.opacity=Math.random()*0.5+0.2;
+stars.appendChild(s);
+}
+
+// Background canvas
+const c=document.getElementById('c'),x=c.getContext('2d');
+const img=new Image();
+img.onload=()=>{
+x.imageSmoothingEnabled=false;
+const S=16,G=17;
+function t(idx,dx,dy){const col=idx%12,row=Math.floor(idx/12);x.drawImage(img,col*G,row*G,S,S,dx*S,dy*S,S,S)}
+// Dark floor
+for(let y=0;y<15;y++)for(let x2=0;x2<20;x2++){
+t(3,x2,y);
+x.fillStyle='rgba(15,15,40,0.6)';x.fillRect(x2*S,y*S,S,S);
+}
+};
+img.src='Tilemap/tilemap_packed.png';
+
+// Selection logic
+let selected=null;
+function select(el){
+document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+el.classList.add('selected');
+selected=el.dataset.name;
+document.getElementById('btnSelect').style.background=
+'select'?'linear-gradient(135deg,#16a34a,#15803d)':'linear-gradient(135deg,#dc2626,#b91c1c)';
+document.getElementById('btnSelect').textContent=`▶ ${selected} 선택 완료`;
+document.querySelector('.hint').textContent=`${selected}이(가) 선택되었습니다!`;
+}
+
+document.getElementById('btnSelect').onclick=()=>{
+if(!selected)alert('캐릭터를 먼저 선택하세요!');
+else alert(`${selected}으로 입장합니다!`);
+};
+</script></body></html>

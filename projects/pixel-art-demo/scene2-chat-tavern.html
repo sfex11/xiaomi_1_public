@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Scene 2 - Pixel Chat Tavern</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:monospace}
+.scene{position:relative;width:960px;height:720px}
+canvas{width:960px;height:720px;image-rendering:pixelated;border:4px solid #8B4513;border-radius:4px}
+.overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.title-bar{position:absolute;top:8px;left:12px;background:rgba(60,20,0,0.85);color:#ffd700;font-size:18px;padding:6px 14px;border:2px solid #ffd700;border-radius:4px}
+.chat-bubble{position:absolute;background:rgba(255,255,255,0.92);color:#333;font-size:11px;padding:5px 8px;border-radius:8px;max-width:130px;box-shadow:1px 1px 3px rgba(0,0,0,0.3)}
+.chat-bubble::after{content:'';position:absolute;bottom:-5px;left:10px;border-width:5px 5px 0;border-style:solid;border-color:rgba(255,255,255,0.92) transparent transparent}
+.chat-bubble.b2{left:auto;right:10%}.chat-bubble.b2::after{left:auto;right:10px}
+.chat-bubble.b3{left:25%;bottom:28%}.chat-bubble.b3::after{left:15px}
+.char-label{position:absolute;color:#fff;font-size:12px;font-weight:bold;text-shadow:1px 1px 2px #000;text-align:center;white-space:nowrap}
+.status-bar{position:absolute;bottom:8px;left:12px;right:12px;display:flex;justify-content:space-between;color:#dda15e;font-size:12px;background:rgba(60,20,0,0.7);padding:6px 12px;border-radius:4px;border:1px solid #8B4513}
+.typing{color:#aaa;font-size:10px;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+</style></head><body>
+<div class="scene">
+<canvas id="c" width="320" height="240"></canvas>
+<div class="overlay">
+<div class="title-bar">🍺 여관 채팅방 - The Agent Tavern</div>
+<div class="char-label" style="left:15%;top:42%">료바</div>
+<div class="char-label" style="left:38%;top:42%">이카</div>
+<div class="char-label" style="left:60%;top:42%">샤오미</div>
+<div class="char-label" style="left:82%;top:42%">회장님</div>
+<div class="chat-bubble" style="left:5%;top:28%">안녕하세요~ 오늘 회의 잘 부탁드려요! 👼</div>
+<div class="chat-bubble b2" style="left:auto;top:28%">채팅 서버 연결 완료! 🐕</div>
+<div class="chat-bubble b3" style="bottom:auto;top:32%">Gateway API 테스트 중... 🤖<br><span class="typing">●●●</span></div>
+<div class="status-bar">
+<span>🔥 온라인: 4명</span>
+<span>💬 메시지: 1,247</span>
+<span>⏰ 오후 1:53</span>
+</div>
+</div>
+</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const img=new Image();
+img.onload=()=>{
+x.imageSmoothingEnabled=false;
+const S=16,G=17;
+function t(idx,dx,dy){const col=idx%12,row=Math.floor(idx/12);x.drawImage(img,col*G,row*G,S,S,dx*S,dy*S,S,S)}
+
+// Wooden floor (use wall tiles as wood-ish)
+const wood=[1,3,4,0,2];
+for(let y=0;y<15;y++)for(let x2=0;x2<20;x2++){
+t(wood[(x2*3+y*7)%5],x2,y);
+// Warm wood tint
+x.fillStyle='rgba(139,90,43,0.15)';x.fillRect(x2*S,y*S,S,S);
+}
+
+// Walls (stone, top rows)
+for(let x2=0;x2<20;x2++){t(14,x2,0);t(14,x2,1)}
+
+// Fireplace on left wall
+t(94,1,0);t(95,1,1);
+t(96,2,0);t(97,2,1);
+// Fire glow
+x.fillStyle='rgba(255,100,0,0.15)';
+x.beginPath();x.arc(2*S+8,2*S,4*S,0,Math.PI*2);x.fill();
+
+// Bar counter (right side)
+for(let i=1;i<8;i++){
+t(68,14+i,3);
+t(69,14+i,4);
+}
+
+// Bar stools
+t(65,15,5);t(65,17,5);t(65,19,5);
+t(67,15,6);t(67,17,6);t(67,19,6);
+
+// Center big table (4 chars sit here)
+for(let i=0;i<5;i++){t(64,7+i,8);t(64,7+i,9)}
+for(let i=0;i<5;i++){t(66,7+i,10);t(66,7+i,11)}
+
+// Chairs around table
+t(65,7,7);t(67,8,7);  // top
+t(65,11,7);t(67,11,12); // sides
+t(66,7,12);t(66,9,12);t(66,11,12); // bottom
+
+// Side tables
+t(64,2,8);t(64,3,8);t(66,2,9);t(67,3,9);
+t(64,15,9);t(64,16,9);t(66,15,10);t(67,16,10);
+
+// Lanterns/candles
+t(10,6,1);t(11,13,1);t(10,0,0);t(11,19,0);
+
+// Food on tables (use small object tiles)
+t(62,8,7);t(62,10,7);t(74,3,7);
+t(62,15,8);t(73,16,8);
+
+// Rug under big table
+x.fillStyle='rgba(120,40,40,0.25)';
+for(let y2=7;y2<=12;y2++)for(let x2=6;x2<=13;x2++){
+x.fillRect(x2*S,y2*S,S,S);
+}
+
+// Side wall pillars
+t(18,0,2);t(16,0,3);t(18,0,4);t(16,0,5);
+t(18,19,2);t(16,19,3);t(18,19,4);t(16,19,5);
+
+// Door
+t(5,9,0);t(5,10,0);
+};
+img.src='Tilemap/tilemap_packed.png';
+</script></body></html>

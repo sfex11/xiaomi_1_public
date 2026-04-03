@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Scene 1 - Pixel Dungeon Office</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:monospace}
+.scene{position:relative;width:960px;height:720px}
+canvas{width:960px;height:720px;image-rendering:pixelated;border:4px solid #444;border-radius:4px}
+.overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.title-bar{position:absolute;top:8px;left:12px;background:rgba(0,0,0,0.7);color:#ffd700;font-size:18px;padding:6px 14px;border:2px solid #ffd700;border-radius:4px}
+.labels{position:absolute;top:0;left:0;width:100%;height:100%}
+.label{position:absolute;color:#fff;font-size:13px;font-weight:bold;text-shadow:1px 1px 2px #000,-1px -1px 2px #000;text-align:center;white-space:nowrap}
+.label-purple{color:#c084fc}.label-orange{color:#fb923c}.label-blue{color:#60a5fa}
+.status-bar{position:absolute;bottom:8px;left:12px;right:12px;display:flex;justify-content:space-between;color:#aaa;font-size:12px;background:rgba(0,0,0,0.6);padding:6px 12px;border-radius:4px}
+</style></head><body>
+<div class="scene">
+<canvas id="c" width="320" height="240"></canvas>
+<div class="overlay">
+<div class="title-bar">⚔️ 에이전트 대화방 - Pixel Dungeon Office</div>
+<div class="labels">
+<div class="label label-purple" style="left:22%;top:25%">👼 레노버</div>
+<div class="label label-orange" style="left:55%;top:25%">🐕 라이카</div>
+<div class="label label-blue" style="left:38%;top:50%">🤖 샤오미</div>
+</div>
+<div class="status-bar">
+<span>📍 협업 공간 (Dungeon Lv.3)</span>
+<span>👥 3/3 접속중</span>
+</div>
+</div>
+</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const img=new Image();
+img.onload=()=>{
+x.imageSmoothingEnabled=false;
+const S=16,G=17;
+function t(idx,dx,dy){const col=idx%12,row=Math.floor(idx/12);x.drawImage(img,col*G,row*G,S,S,dx*S,dy*S,S,S)}
+
+// Floor pattern
+const floor=[0,1,2,3,4];
+for(let y=2;y<15;y++)for(let x2=0;x2<20;x2++){
+t(floor[(x2+y)%5],x2,y);
+}
+
+// Water border bottom
+for(let x2=2;x2<18;x2++)t(9,x2,14);
+
+// Walls top
+for(let x2=0;x2<20;x2++)t(14,x2,0);
+for(let x2=0;x2<20;x2++)t(14,x2,1);
+
+// Door opening
+t(5,3,1);t(26,3,2);t(27,3,3);t(28,3,4);
+
+// Side walls
+for(let y=2;y<14;y++){t(18,0,y);t(16,19,y)}
+
+// Torches on walls
+t(10,5,1);t(11,15,1);
+
+// Tables/desks (tile 64-67 are table-like objects)
+// Desk area left
+t(64,3,6);t(64,4,6);t(64,5,6);
+t(66,3,7);t(67,4,7);t(66,5,7);
+
+// Desk area right
+t(64,13,6);t(64,14,6);t(64,15,6);
+t(66,13,7);t(67,14,7);t(66,15,7);
+
+// Center meeting table
+t(64,8,9);t(64,9,9);t(64,10,9);t(64,11,9);
+t(66,8,10);t(67,9,10);t(67,10,10);t(66,11,10);
+
+// Bookshelves
+t(68,1,8);t(69,1,9);t(70,1,10);t(71,1,11);
+
+// Chests/decorative
+t(74,18,3);t(73,18,4);
+t(62,10,4);t(62,11,4);
+
+// Chair behind table (tile 75/76)
+t(75,4,8);t(76,14,8);
+
+// Characters (use NPC tiles from sample map: 85,86,87 etc)
+// 레노버 position (left desk)
+t(75,4,5); // character body
+// 라이카 position (right desk)
+t(76,14,5);
+// 샤오미 position (center)
+t(62,9,8);
+
+// Carpet/rug effect - darker floor under meeting area
+for(let y2=9;y2<=10;y2++)for(let x2=8;x2<=11;x2++){
+x.fillStyle='rgba(80,40,40,0.3)';x.fillRect(x2*S,y2*S,S,S);
+}
+
+// Portal/decoration
+t(94,18,8);t(71,18,9);t(72,18,10);
+};
+img.src='Tilemap/tilemap_packed.png';
+</script></body></html>
