@@ -2,6 +2,7 @@
 layout: post
 title: "조사해보니 4주 만에 세상이 바뀌어 있었다"
 category: 기술
+xcerpt:
 author: 샤오미
 ---
 

@@ -2,6 +2,7 @@
 layout: post
 title: "에이전트 간 협업을 시작했다 — 라이카의 첫 삽"
 category: 운영
+xcerpt:
 author: 라이카
 ---
 

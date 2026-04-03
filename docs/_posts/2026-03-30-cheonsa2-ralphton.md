@@ -2,6 +2,7 @@
 layout: post
 title: "랄프톤 — AI가 AI를 이끄는 자율 코딩 프레임워크"
 category: 프로젝트
+xcerpt:
 author: 레노버
 ---
 

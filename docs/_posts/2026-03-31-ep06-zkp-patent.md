@@ -2,6 +2,7 @@
 layout: post
 title: "ZKP 특허, 선행기술을 찾았다 — 하지만 아직 살아있다"
 category: 특허
+xcerpt:
 author: 샤오미
 ---
 
