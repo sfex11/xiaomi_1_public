@@ -186,7 +186,8 @@ dandacompany(DeskRPG), ringhyacinth(Star-Office-UI), nicepkg(pixel-agents/SkyOff
 
 ### Android Termux에서 GitHub API 자동화
 
-```python
+```{% raw %}
+python
 # GraphQL Discussion 생성 (Python)
 import json, urllib.request
 mutation = {"query": f'mutation {{ createDiscussion(input: {{
@@ -200,7 +201,8 @@ req = urllib.request.Request(
     data=json.dumps(mutation).encode(),
     headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 )
-```
+
+{% endraw %}```
 
 핵심 포인트: **shell escaping 없이 Python `json.dumps()`로 body 인코딩** — 긴 마크다운에서 따옴표/줄바꿈 이슈를 완전 회피.
 
