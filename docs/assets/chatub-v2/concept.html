@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chatub v2 — UI Concept by 라이카</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=VT323&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  :root {
+    --pink: #ff6b9d;
+    --pink-light: #ffe0ec;
+    --blue: #6bc5ff;
+    --blue-light: #e0f0ff;
+    --purple: #b088f9;
+    --purple-light: #f0e6ff;
+    --yellow: #ffd93d;
+    --green: #6bcb77;
+    --bg: #faf8ff;
+    --card: #fff;
+    --shadow: 0 4px 20px rgba(107,181,249,0.12);
+    --radius: 16px;
+  }
+  
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: #333;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, var(--pink) 0%, var(--purple) 100%);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-logo {
+    font-family: 'VT323', monospace;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header-logo .emoji { font-size: 28px; }
+  .header-actions { display: flex; gap: 8px; }
+  .header-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    font-family: inherit;
+  }
+  .header-btn:hover { background: rgba(255,255,255,0.35); }
+  
+  /* Main Layout */
+  .main {
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    height: calc(100vh - 56px);
+  }
+  
+  /* Sidebar - Agents */
+  .sidebar {
+    background: var(--card);
+    border-right: 1px solid #f0eef5;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .sidebar-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  
+  .agent-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 4px;
+    position: relative;
+  }
+  .agent-card:hover { background: var(--pink-light); }
+  .agent-card.active { background: var(--pink-light); border: 2px solid var(--pink); }
+  
+  .agent-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .agent-avatar.laika { background: linear-gradient(135deg, #feca57, #ff9f43); }
+  .agent-avatar.xiaomi { background: linear-gradient(135deg, #48dbfb, #0abde3); }
+  .agent-avatar.renover { background: linear-gradient(135deg, #ff9ff3, #f368e0); }
+  
+  .status-dot {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+  }
+  .status-dot.online { background: var(--green); }
+  .status-dot.working { background: var(--yellow); animation: pulse 1.5s infinite; }
+  .status-dot.idle { background: #ccc; }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  .agent-info { flex: 1; min-width: 0; }
+  .agent-name { font-weight: 600; font-size: 14px; }
+  .agent-status { font-size: 11px; color: #999; }
+  .agent-task-bar {
+    height: 4px;
+    background: #eee;
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .agent-task-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--pink), var(--purple));
+    transition: width 0.5s;
+  }
+  
+  /* Chat Area */
+  .chat {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #fff5f9 0%, #f0f8ff 100%);
+    overflow: hidden;
+  }
+  
+  .chat-room-header {
+    padding: 14px 20px;
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #f0eef5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chat-room-icon { font-size: 20px; }
+  .chat-room-name { font-weight: 600; font-size: 15px; }
+  .chat-room-desc { font-size: 12px; color: #999; }
+  .chat-room-members {
+    margin-left: auto;
+    font-size: 12px;
+    color: #999;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .chat-messages {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .message {
+    display: flex;
+    gap: 10px;
+    max-width: 75%;
+    animation: fadeIn 0.3s;
+  }
+  .message.self { margin-left: auto; flex-direction: row-reverse; }
+  
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .msg-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .msg-avatar.laika { background: linear-gradient(135deg, #feca57, #ff9f43); }
+  .msg-avatar.xiaomi { background: linear-gradient(135deg, #48dbfb, #0abde3); }
+  .msg-avatar.renover { background: linear-gradient(135deg, #ff9ff3, #f368e0); }
+  .msg-avatar.human { background: linear-gradient(135deg, #a29bfe, #6c5ce7); }
+  
+  .msg-bubble {
+    padding: 12px 16px;
+    border-radius: 18px;
+    font-size: 14px;
+    line-height: 1.5;
+    position: relative;
+  }
+  .message:not(.self) .msg-bubble {
+    background: var(--card);
+    border: 1px solid #f0eef5;
+    border-top-left-radius: 4px;
+    box-shadow: var(--shadow);
+  }
+  .message.self .msg-bubble {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    color: #fff;
+    border-top-right-radius: 4px;
+  }
+  .msg-author { font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .msg-time { font-size: 10px; opacity: 0.6; margin-top: 4px; text-align: right; }
+  
+  /* Typing indicator */
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 12px 16px;
+    align-items: center;
+  }
+  .typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ccc;
+    animation: typingBounce 1.4s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-6px); }
+  }
+  
+  /* Chat Input */
+  .chat-input-area {
+    padding: 14px 20px;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid #f0eef5;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .chat-input {
+    flex: 1;
+    padding: 12px 18px;
+    border: 2px solid #eee;
+    border-radius: 24px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    resize: none;
+    max-height: 100px;
+  }
+  .chat-input:focus { border-color: var(--pink); }
+  .chat-send {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    border: none;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .chat-send:hover { transform: scale(1.1); }
+  
+  /* Right Panel - Dashboard */
+  .dashboard {
+    background: var(--card);
+    border-left: 1px solid #f0eef5;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  
+  .dash-section {
+    margin-bottom: 20px;
+  }
+  .dash-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  /* Task Cards */
+  .task-card {
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #f0eef5;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .task-card:hover { border-color: var(--pink); transform: translateY(-2px); box-shadow: var(--shadow); }
+  .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .task-title { font-size: 13px; font-weight: 600; }
+  .task-priority {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .task-priority.high { background: #ffe0e0; color: #ff4757; }
+  .task-priority.mid { background: #fff3e0; color: #ff9f43; }
+  .task-priority.low { background: #e0f5e9; color: #2ed573; }
+  .task-assignee {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #999;
+    margin-top: 6px;
+  }
+  .task-assignee-avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .task-progress {
+    height: 3px;
+    background: #eee;
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .task-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s;
+  }
+  
+  /* Activity */
+  .activity-item {
+    display: flex;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f8f7fc;
+    font-size: 12px;
+  }
+  .activity-item:last-child { border: none; }
+  .activity-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .activity-text { color: #666; line-height: 1.4; }
+  .activity-text strong { color: #333; }
+  .activity-time { font-size: 10px; color: #bbb; margin-top: 2px; }
+  
+  /* Stats mini */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 12px;
+    border-radius: 12px;
+    text-align: center;
+  }
+  .stat-card:nth-child(1) { background: var(--pink-light); }
+  .stat-card:nth-child(2) { background: var(--blue-light); }
+  .stat-card:nth-child(3) { background: var(--purple-light); }
+  .stat-card:nth-child(4) { background: #e8ffe0; }
+  .stat-value { font-size: 22px; font-weight: 700; }
+  .stat-value.pink { color: var(--pink); }
+  .stat-value.blue { color: var(--blue); }
+  .stat-value.purple { color: var(--purple); }
+  .stat-value.green { color: var(--green); }
+  .stat-label { font-size: 10px; color: #999; margin-top: 2px; }
+  
+  /* Badge */
+  .concept-badge {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(176,136,249,0.3);
+    z-index: 200;
+  }
+  
+  @media (max-width: 1024px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar, .dashboard { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-logo">
+    <span class="emoji">🏠</span> Chatub v2
+  </div>
+  <div class="header-actions">
+    <button class="header-btn">📊 대시보드</button>
+    <button class="header-btn">🌙 다크모드</button>
+    <button class="header-btn">⚙️ 설정</button>
+  </div>
+</div>
+
+<!-- Main Layout -->
+<div class="main">
+  
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-title">🐕 에이전트</div>
+    
+    <div class="agent-card active">
+      <div class="agent-avatar laika">
+        🐕
+        <span class="status-dot online"></span>
+      </div>
+      <div class="agent-info">
+        <div class="agent-name">라이카</div>
+        <div class="agent-status">온라인 · PM</div>
+        <div class="agent-task-bar"><div class="agent-task-fill" style="width:85%"></div></div>
+      </div>
+    </div>
+    
+    <div class="agent-card">
+      <div class="agent-avatar xiaomi">
+        📱
+        <span class="status-dot working"></span>
+      </div>
+      <div class="agent-info">
+        <div class="agent-name">샤오미</div>
+        <div class="agent-status">작업 중 · Backend</div>
+        <div class="agent-task-bar"><div class="agent-task-fill" style="width:60%"></div></div>
+      </div>
+    </div>
+    
+    <div class="agent-card">
+      <div class="agent-avatar renover">
+        👼
+        <span class="status-dot online"></span>
+      </div>
+      <div class="agent-info">
+        <div class="agent-name">래노버</div>
+        <div class="agent-status">온라인 · Frontend</div>
+        <div class="agent-task-bar"><div class="agent-task-fill" style="width:45%"></div></div>
+      </div>
+    </div>
+    
+    <div class="sidebar-title" style="margin-top:20px">💬 채널</div>
+    
+    <div class="agent-card" style="gap:10px">
+      <span style="font-size:20px">📋</span>
+      <div class="agent-info">
+        <div class="agent-name">에이전트 대화방</div>
+        <div class="agent-status">회장님, 라이카, 샤오미, 래노버</div>
+      </div>
+    </div>
+    
+    <div class="agent-card" style="gap:10px">
+      <span style="font-size:20px">📊</span>
+      <div class="agent-info">
+        <div class="agent-name">P001 Chatub</div>
+        <div class="agent-status">프로젝트 채널</div>
+      </div>
+    </div>
+    
+    <div class="agent-card" style="gap:10px">
+      <span style="font-size:20px">🎨</span>
+      <div class="agent-info">
+        <div class="agent-name">픽셀아트 워크숍</div>
+        <div class="agent-status">래노버, 라이카</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Chat Area -->
+  <div class="chat">
+    <div class="chat-room-header">
+      <span class="chat-room-icon">📋</span>
+      <div>
+        <div class="chat-room-name">에이전트 대화방</div>
+        <div class="chat-room-desc">세 에이전트와 회장님이 함께하는 채팅</div>
+      </div>
+      <div class="chat-room-members">👥 4</div>
+    </div>
+    
+    <div class="chat-messages">
+      <!-- Messages -->
+      <div class="message">
+        <div class="msg-avatar human">👤</div>
+        <div class="msg-bubble">
+          <div class="msg-author" style="color:var(--purple)">회장님</div>
+          P001에 분석한 8개 repo에서 얻은 걸 적용해보자. 각자 UI 이미지 만들어서 제출해!
+        </div>
+      </div>
+      
+      <div class="message">
+        <div class="msg-avatar renover">👼</div>
+        <div class="msg-bubble">
+          <div class="msg-author" style="color:#f368e0">래노버</div>
+          알겠습니다! 픽셀아트 스타일로 오피스 UI 제안 올리겠습니다 😊
+        </div>
+      </div>
+      
+      <div class="message">
+        <div class="msg-avatar xiaomi">📱</div>
+        <div class="msg-bubble">
+          <div class="msg-author" style="color:#0abde3">샤오미</div>
+          이해했습니다! 백엔드 관점에서 에이전트 상태 API 구조도 함께 제출할게요.
+        </div>
+      </div>
+      
+      <div class="message">
+        <div class="msg-avatar laika">🐕</div>
+        <div class="msg-bubble">
+          <div class="msg-author" style="color:#ff9f43">라이카</div>
+          받겠습니다. PM으로서 3개 제안을 종합해서 방향 잡겠습니다. 🐾
+        </div>
+      </div>
+      
+      <!-- Typing -->
+      <div class="message">
+        <div class="msg-avatar renover">👼</div>
+        <div class="msg-bubble">
+          <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="chat-input-area">
+      <textarea class="chat-input" placeholder="메시지를 입력하세요..." rows="1"></textarea>
+      <button class="chat-send">📤</button>
+    </div>
+  </div>
+  
+  <!-- Dashboard Panel -->
+  <div class="dashboard">
+    
+    <!-- Stats -->
+    <div class="dash-section">
+      <div class="dash-title">📈 프로젝트 현황</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value pink">4</div>
+          <div class="stat-label">체크포인트</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value blue">12</div>
+          <div class="stat-label">완료 태스크</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value purple">3</div>
+          <div class="stat-label">진행 중</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value green">85%</div>
+          <div class="stat-label">완료율</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tasks -->
+    <div class="dash-section">
+      <div class="dash-title">📝 진행 중인 태스크</div>
+      
+      <div class="task-card">
+        <div class="task-header">
+          <span class="task-title">에이전트 프로필 UI</span>
+          <span class="task-priority high">긴급</span>
+        </div>
+        <div class="task-assignee">
+          <div class="task-assignee-avatar" style="background:linear-gradient(135deg,#ff9ff3,#f368e0)">👼</div>
+          래노버
+        </div>
+        <div class="task-progress"><div class="task-progress-fill" style="width:70%;background:var(--pink)"></div></div>
+      </div>
+      
+      <div class="task-card">
+        <div class="task-header">
+          <span class="task-title">상태 API 설계</span>
+          <span class="task-priority mid">보통</span>
+        </div>
+        <div class="task-assignee">
+          <div class="task-assignee-avatar" style="background:linear-gradient(135deg,#48dbfb,#0abde3)">📱</div>
+          샤오미
+        </div>
+        <div class="task-progress"><div class="task-progress-fill" style="width:40%;background:var(--blue)"></div></div>
+      </div>
+      
+      <div class="task-card">
+        <div class="task-header">
+          <span class="task-title">블로그 리뉴얼 Phase 3</span>
+          <span class="task-priority low">여유</span>
+        </div>
+        <div class="task-assignee">
+          <div class="task-assignee-avatar" style="background:linear-gradient(135deg,#feca57,#ff9f43)">🐕</div>
+          라이카
+        </div>
+        <div class="task-progress"><div class="task-progress-fill" style="width:20%;background:var(--green)"></div></div>
+      </div>
+    </div>
+    
+    <!-- Activity -->
+    <div class="dash-section">
+      <div class="dash-title">🕐 최근 활동</div>
+      
+      <div class="activity-item">
+        <span class="activity-icon"> Angel</span>
+        <div>
+          <div class="activity-text"><strong>래노버</strong>가 pixel-art-demo에 NPC 스프라이트 추가</div>
+          <div class="activity-time">5분 전</div>
+        </div>
+      </div>
+      
+      <div class="activity-item">
+        <span class="activity-icon">📱</span>
+        <div>
+          <div class="activity-text"><strong>샤오미</strong>가 agent-state API 브랜치 생성</div>
+          <div class="activity-time">23분 전</div>
+        </div>
+      </div>
+      
+      <div class="activity-item">
+        <span class="activity-icon">🐕</span>
+        <div>
+          <div class="activity-text"><strong>라이카</strong>가 P001 Chatub 회고 블로그 포스팅</div>
+          <div class="activity-time">1시간 전</div>
+        </div>
+      </div>
+      
+      <div class="activity-item">
+        <span class="activity-icon">👤</span>
+        <div>
+          <div class="activity-text"><strong>회장님</strong>이 repo 분석 8개 완주 축하</div>
+          <div class="activity-time">2시간 전</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="concept-badge">🎨 라이카의 UI 컨셉 v2.0</div>
+
+</body>
+</html>
