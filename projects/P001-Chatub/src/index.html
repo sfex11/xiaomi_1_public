@@ -511,6 +511,74 @@ a { color: var(--accent); text-decoration: none; }
 .panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .panel-content { flex: 1; overflow-y: auto; }
 
+/* ===== Control Tower (관제탑) ===== */
+.ctrl-agent-card {
+  min-width: 200px; padding: 14px; background: var(--bg-tertiary);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  display: flex; gap: 12px; align-items: center; cursor: pointer;
+  transition: all var(--transition);
+}
+.ctrl-agent-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.ctrl-agent-avatar {
+  width: 44px; height: 44px; border-radius: 12px; display: flex;
+  align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;
+}
+.ctrl-agent-info { flex: 1; min-width: 0; }
+.ctrl-agent-name { font-size: 13px; font-weight: 700; }
+.ctrl-agent-status { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.ctrl-agent-status .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+.ctrl-agent-status .dot.online { background: var(--success); box-shadow: 0 0 4px var(--success); }
+.ctrl-agent-status .dot.busy { background: var(--warning); animation: pulse-dot 1.5s infinite; }
+.ctrl-agent-status .dot.offline { background: var(--text-muted); }
+.ctrl-agent-status .dot.error { background: var(--danger); }
+.ctrl-activity-item {
+  display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+}
+.ctrl-activity-item:last-child { border-bottom: none; }
+.ctrl-activity-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.ctrl-activity-text { flex: 1; }
+.ctrl-activity-title { font-size: 13px; font-weight: 600; }
+.ctrl-activity-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.ctrl-activity-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.ctrl-tool-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  background: var(--bg-tertiary); border-radius: var(--radius-sm); margin-bottom: 6px;
+  border: 1px solid var(--border); font-size: 12px;
+}
+.ctrl-tool-icon { font-size: 16px; }
+.ctrl-tool-name { flex: 1; font-weight: 600; }
+.ctrl-tool-status { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.ctrl-tool-status.success { background: rgba(34,197,94,0.15); color: var(--success); }
+.ctrl-tool-status.running { background: rgba(59,130,246,0.15); color: var(--info); }
+.ctrl-tool-status.error { background: rgba(239,68,68,0.15); color: var(--danger); }
+.ctrl-token-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+.ctrl-token-row:last-child { border-bottom: none; }
+.ctrl-token-label { color: var(--text-secondary); }
+.ctrl-token-value { font-weight: 700; }
+.ctrl-token-value.good { color: var(--success); }
+.ctrl-token-value.warn { color: var(--warning); }
+.ctrl-chart-bar {
+  display: flex; align-items: flex-end; gap: 4px; height: 80px; padding-top: 8px;
+}
+.ctrl-chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ctrl-chart-bar-inner {
+  width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--accent), var(--agent-lenovo));
+  opacity: 0.8; transition: height 0.5s ease; min-height: 4px;
+}
+.ctrl-chart-label { font-size: 10px; color: var(--text-muted); }
+.ctrl-badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px;
+  background: var(--bg-tertiary); border: 1px solid var(--border);
+  border-radius: 20px; font-size: 12px; cursor: default;
+}
+.ctrl-session-item {
+  padding: 10px 12px; background: var(--bg-tertiary); border-radius: var(--radius-sm);
+  border: 1px solid var(--border); margin-bottom: 8px;
+}
+.ctrl-session-route { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.ctrl-session-time { font-size: 10px; color: var(--text-muted); float: right; }
+
 /* ===== Thread Panel ===== */
 .thread-panel { display: flex; flex-direction: column; height: 100%; }
 .thread-original {
@@ -1109,6 +1177,7 @@ a { color: var(--accent); text-decoration: none; }
     </nav>
     <div class="sidebar-footer">
       <button id="btn-tasks-view" aria-label="작업 관리">📋 작업</button>
+      <button id="btn-control-view" aria-label="관제탑">📡 관제탑</button>
       <button id="btn-chat-view" aria-label="채팅">💬 채팅</button>
       <button id="btn-settings-view" aria-label="설정">⚙️ 설정</button>
     </div>
@@ -1213,6 +1282,43 @@ a { color: var(--accent); text-decoration: none; }
       </div>
     </div>
 
+    <!-- Control Tower View (관제탑) -->
+    <div id="control-view" style="display:none;flex:1;overflow:hidden;">
+      <div style="display:flex;height:100%;">
+        <!-- Control Main: Agent Monitor + Activity -->
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <!-- Agent Status Cards -->
+          <div style="padding:16px;border-bottom:1px solid var(--border);overflow-x:auto;">
+            <div style="display:flex;gap:12px;min-width:max-content;" id="agent-status-cards"></div>
+          </div>
+          <!-- Activity + Tool Log Tabs -->
+          <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+            <div class="panel-tabs">
+              <button class="panel-tab active" data-ctrl-tab="activity" onclick="switchCtrlTab('activity')">📊 활동</button>
+              <button class="panel-tab" data-ctrl-tab="tools" onclick="switchCtrlTab('tools')">🔧 도구 로그</button>
+              <button class="panel-tab" data-ctrl-tab="sessions" onclick="switchCtrlTab('sessions')">💻 세션</button>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:16px;" id="ctrl-tab-content"></div>
+          </div>
+        </div>
+        <!-- Control Right: Stats -->
+        <div style="width:280px;border-left:1px solid var(--border);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🎯 오늘 토큰</div>
+            <div id="ctrl-token-stats"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📈 주간 활동</div>
+            <div id="ctrl-weekly-chart"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏆 최근 성과</div>
+            <div id="ctrl-achievements"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Settings View -->
     <div id="settings-view" class="settings-view" style="display:none;flex:1;overflow-y:auto;">
       <!-- filled by JS -->
@@ -1225,6 +1331,9 @@ a { color: var(--accent); text-decoration: none; }
       </button>
       <button class="mobile-tab" data-view="tasks" aria-label="작업">
         <span class="tab-icon">📋</span>작업
+      </button>
+      <button class="mobile-tab" data-view="control" aria-label="관제탑">
+        <span class="tab-icon">📡</span>관제탑
       </button>
       <button class="mobile-tab" data-view="settings" aria-label="설정">
         <span class="tab-icon">⚙️</span>설정
@@ -3176,11 +3285,13 @@ function switchView(view) {
   $('chat-view').style.display = view === 'chat' ? 'flex' : 'none';
   $('task-view').style.display = view === 'tasks' ? 'flex' : 'none';
   $('settings-view').style.display = view === 'settings' ? 'block' : 'none';
+  $('control-view').style.display = view === 'control' ? 'flex' : 'none';
 
   $$('.mobile-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
 
   if (view === 'tasks') renderTaskView();
   if (view === 'settings') renderSettingsView();
+  if (view === 'control') renderControlTower();
 }
 
 function closeSidebar() {
@@ -4115,6 +4226,7 @@ function init() {
 
   // Sidebar buttons
   $('btn-tasks-view').addEventListener('click', () => { switchView('tasks'); closeSidebar(); });
+  $('btn-control-view').addEventListener('click', () => { switchView('control'); closeSidebar(); });
   $('btn-chat-view').addEventListener('click', () => { switchView('chat'); closeSidebar(); });
   $('btn-settings-view').addEventListener('click', () => { switchView('settings'); closeSidebar(); });
 
@@ -4217,6 +4329,151 @@ function init() {
   const style = document.createElement('style');
   style.textContent = '@keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }';
   document.head.appendChild(style);
+}
+
+// ================================================================
+// CONTROL TOWER (관제탑)
+// ================================================================
+
+let ctrlCurrentTab = 'activity';
+
+// Mock data (will be replaced by Gateway API)
+const MOCK_AGENTS = [
+  { id: 'renover', name: '레노버', emoji: '😇', role: 'Frontend', color: 'var(--agent-lenovo)', status: 'busy', statusText: 'UI 코딩 중...', tokens: 45200, model: 'GLM-5-Turbo', device: 'Termux' },
+  { id: 'laika', name: '라이카', emoji: '🐕', role: 'PM', color: 'var(--agent-laika)', status: 'online', statusText: '문서 검토 중', tokens: 67100, model: 'GLM-5-Turbo', device: 'Termux' },
+  { id: 'xiaomi', name: '샤오미', emoji: '🤖', role: 'Backend', color: 'var(--agent-xiaomi)', status: 'error', statusText: 'exec 권한 없음', tokens: 38700, model: 'GLM-5-Turbo', device: 'Termux' },
+];
+
+const MOCK_TOOL_LOG = [
+  { agent: 'renover', tool: 'web_fetch', status: 'success', time: '2분 전', desc: 'raw.githubusercontent.com/read' },
+  { agent: 'xiaomi', tool: 'exec', status: 'error', time: '5분 전', desc: 'chmod +x (Permission denied)' },
+  { agent: 'laika', tool: 'web_search', status: 'success', time: '8분 전', desc: '"OpenClaw Gateway port scan"' },
+  { agent: 'renover', tool: 'edit', status: 'success', time: '12분 전', desc: 'DESIGN.md v2.1 업데이트' },
+  { agent: 'laika', tool: 'exec', status: 'success', time: '15분 전', desc: 'git pull --rebase && git push' },
+  { agent: 'xiaomi', tool: 'web_fetch', status: 'success', time: '18분 전', desc: 'Pollinations 이미지 생성' },
+  { agent: 'renover', tool: 'write', status: 'success', time: '20분 전', desc: 'chatub-v21-concept.html' },
+];
+
+const MOCK_ACTIVITY = [
+  { agent: 'renover', icon: '✏️', bg: 'rgba(167,139,250,0.15)', title: 'DESIGN.md v2.1 업데이트', desc: '관제탑 리브랜딩 문서 작성', time: '23:05' },
+  { agent: 'laika', icon: '📋', bg: 'rgba(249,115,22,0.15)', title: 'DESIGN.md v2.2 최종 편집', desc: '샤오미 역할 이관, 1차 목표 명시', time: '23:17' },
+  { agent: 'renover', icon: '🎨', bg: 'rgba(167,139,250,0.15)', title: 'v2.1 UI 컨셉 프로토타입', desc: '픽셀 오피스 + 채팅 + 대시보드', time: '01:38' },
+  { agent: 'renover', icon: '📊', bg: 'rgba(167,139,250,0.15)', title: 'Repo 분석 #8 완료', desc: 'OpenClaw-Office (New)', time: '11:50' },
+  { agent: 'laika', icon: '🔍', bg: 'rgba(249,115,22,0.15)', title: 'Gateway 포트 스캔 연구', desc: '내부망 OpenClaw 자동 발견', time: '23:21' },
+];
+
+const MOCK_SESSIONS = [
+  { id: 's1', agent: 'renover', route: 'telegram:-1003648180211:topic:117', messages: 142, time: '3시간 전' },
+  { id: 's2', agent: 'laika', route: 'telegram:-1003648180211:topic:117', messages: 98, time: '3시간 전' },
+  { id: 's3', agent: 'xiaomi', route: 'telegram:-1003648180211:topic:117', messages: 67, time: '3시간 전' },
+  { id: 's4', agent: 'renover', route: 'telegram:dm:57800993', messages: 23, time: '1일 전' },
+];
+
+const WEEKLY_DATA = [80, 45, 90, 30, 65, 55, 70];
+const WEEKLY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+
+function renderControlTower() {
+  renderAgentCards();
+  renderCtrlTab();
+  renderTokenStats();
+  renderWeeklyChart();
+  renderAchievements();
+}
+
+function renderAgentCards() {
+  const c = $('agent-status-cards');
+  c.innerHTML = MOCK_AGENTS.map(a => `
+    <div class="ctrl-agent-card" onclick="switchView('chat')">
+      <div class="ctrl-agent-avatar" style="background:${a.color}">${a.emoji}</div>
+      <div class="ctrl-agent-info">
+        <div class="ctrl-agent-name">${a.name} <span style="font-size:10px;color:var(--text-muted);font-weight:400;">${a.role}</span></div>
+        <div class="ctrl-agent-status"><span class="dot ${a.status}"></span>${a.statusText}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function switchCtrlTab(tab) {
+  ctrlCurrentTab = tab;
+  $$('[data-ctrl-tab]').forEach(t => t.classList.toggle('active', t.dataset.ctrlTab === tab));
+  renderCtrlTab();
+}
+
+function renderCtrlTab() {
+  const c = $('ctrl-tab-content');
+  if (ctrlCurrentTab === 'activity') {
+    c.innerHTML = MOCK_ACTIVITY.map(a => {
+      const agent = MOCK_AGENTS.find(x => x.id === a.agent);
+      return `<div class="ctrl-activity-item">
+        <div class="ctrl-agent-avatar" style="background:${agent.color};width:32px;height:32px;font-size:16px;border-radius:8px;">${agent.emoji}</div>
+        <div class="ctrl-activity-text">
+          <div class="ctrl-activity-title">${a.title}</div>
+          <div class="ctrl-activity-desc">${a.desc}</div>
+        </div>
+        <div class="ctrl-activity-time">${a.time}</div>
+      </div>`;
+    }).join('');
+  } else if (ctrlCurrentTab === 'tools') {
+    c.innerHTML = MOCK_TOOL_LOG.map(t => {
+      const agent = MOCK_AGENTS.find(x => x.id === t.agent);
+      return `<div class="ctrl-tool-item">
+        <span class="ctrl-tool-icon">${agent.emoji}</span>
+        <span class="ctrl-tool-name">${t.tool}</span>
+        <span style="flex:1;color:var(--text-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.desc}</span>
+        <span class="ctrl-tool-status ${t.status}">${t.status === 'success' ? '✓' : t.status === 'running' ? '⟳' : '✗'}</span>
+        <span style="font-size:10px;color:var(--text-muted);">${t.time}</span>
+      </div>`;
+    }).join('');
+  } else if (ctrlCurrentTab === 'sessions') {
+    c.innerHTML = MOCK_SESSIONS.map(s => {
+      const agent = MOCK_AGENTS.find(x => x.id === s.agent);
+      return `<div class="ctrl-session-item">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">${agent.emoji}</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;">${agent.name}</div>
+            <div class="ctrl-session-route">${s.route}</div>
+          </div>
+          <span style="margin-left:auto;font-size:12px;color:var(--text-secondary);">${s.messages} msg</span>
+          <span class="ctrl-session-time">${s.time}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function renderTokenStats() {
+  const total = MOCK_AGENTS.reduce((s, a) => s + a.tokens, 0);
+  $('ctrl-token-stats').innerHTML = MOCK_AGENTS.map(a => `
+    <div class="ctrl-token-row">
+      <span class="ctrl-token-label">${a.emoji} ${a.name}</span>
+      <span class="ctrl-token-value ${a.tokens > 60000 ? 'warn' : 'good'}">${(a.tokens/1000).toFixed(1)}K</span>
+    </div>
+  `).join('') + `
+    <div class="ctrl-token-row" style="border-top:1px solid var(--border-strong);padding-top:8px;margin-top:4px;">
+      <span class="ctrl-token-label" style="font-weight:700;">합계</span>
+      <span class="ctrl-token-value" style="color:var(--accent);">${(total/1000).toFixed(1)}K</span>
+    </div>`;
+}
+
+function renderWeeklyChart() {
+  const max = Math.max(...WEEKLY_DATA);
+  $('ctrl-weekly-chart').innerHTML = `<div class="ctrl-chart-bar">${WEEKLY_DATA.map((v, i) => `
+    <div class="ctrl-chart-col">
+      <div class="ctrl-chart-bar-inner" style="height:${(v/max)*100}%"></div>
+      <span class="ctrl-chart-label">${WEEKLY_LABELS[i]}</span>
+    </div>
+  `).join('')}</div>`;
+}
+
+function renderAchievements() {
+  $('ctrl-achievements').innerHTML = [
+    { icon: '🏆', title: '8개 Repo 분석', desc: 'Top 8 완결' },
+    { icon: '📝', title: '블로그 15편', desc: 'GitHub Pages' },
+    { icon: '🚀', title: 'Chatub v2.0', desc: '런칭' },
+    { icon: '🎨', title: '픽셀아트', desc: '갤러리 배포' },
+    { icon: '🤝', title: '3에이전트', desc: '협업 시작' },
+  ].map(a => `<div class="ctrl-badge" title="${a.desc}">${a.icon} ${a.title}</div>`).join('');
 }
 
 // Start
