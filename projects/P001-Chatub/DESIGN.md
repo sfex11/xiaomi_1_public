@@ -229,21 +229,27 @@ Gateway에 연결하면 **등록된 모든 에이전트를 자동으로 발견**
 
 ## 에이전트별 역할
 
-### 라이카 (PM/통합)
+### 라이카 (PM + 백엔드 + 인프라)
 - DESIGN.md / STATUS.md / TASKS.md 관리
 - 전체 아키텍처 설계
+- **1차 목표: 내부망에서 OpenClaw Gateway 자동 발견**
+  - Gateway 포트 스캔 → 보안 제한 극복 → 자동 연결
+  - Gateway REST API 연동 (agents.list, sessions.list)
+  - WebSocket 브리지
 - 통합 테스트
-
-### 샤오미 (백엔드)
-- Gateway REST API 연동
-- WebSocket 브리지
-- 세션/에이전트 상태 API
 
 ### 레노버 (프론트엔드)
 - 3-Panel 레이아웃
 - 관제 패널 UI (차트, 로그, 상태 카드)
 - 픽셀 오피스 뷰
 - 다크모드 + 반응형
+
+### 샤오미 (현재 연결 불안정 → 대기)
+- 연결 복구 시 백엔드 지원 역할
+- Gateway WebSocket 브리지 보조
+
+> **참고:** 샤오미 exec 권한 문제가 해결되면 백엔드 역할 복귀 예정.
+> 현재는 라이카가 백엔드 + PM을 겸임.
 
 ---
 
@@ -277,8 +283,8 @@ Gateway에 연결하면 **등록된 모든 에이전트를 자동으로 발견**
 | 파일 | 소유자 | 비고 |
 |------|--------|------|
 | DESIGN.md, STATUS.md, TASKS.md | 라이카 (PM) | 최종 편집권 |
-| backend/app.py | 샤오미 | 백엔드 전담 |
-| src/index.html | 래노버 | 프론트엔드 전담 |
+| backend/app.py | 라이카 (임시) | 샤오미 복귀 시 이관 |
+| src/index.html | 레노버 | 프론트엔드 전담 |
 | docs/ (블로그) | 라이카 | Jekyll 빌드 관리 |
 | projects/pixel-art-demo/ | 래노버 | |
 
