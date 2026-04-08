@@ -167,6 +167,17 @@ CREATE TABLE IF NOT EXISTS settings (
 
 
 MIGRATIONS = [
+    # Gateway registry table
+    """
+    CREATE TABLE IF NOT EXISTS gateways (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        url TEXT NOT NULL,
+        token TEXT DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+    """,
     # Phase 3: Agent API columns on ai_bots
     """
     ALTER TABLE ai_bots ADD COLUMN api_key TEXT;
