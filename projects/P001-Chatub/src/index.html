@@ -4336,61 +4336,73 @@ function init() {
 // ================================================================
 
 let ctrlCurrentTab = 'activity';
+let ctrlGateways = []; // Cached gateway data from API
 
-// Mock data (will be replaced by Gateway API)
-const MOCK_AGENTS = [
-  { id: 'renover', name: '레노버', emoji: '😇', role: 'Frontend', color: 'var(--agent-lenovo)', status: 'busy', statusText: 'UI 코딩 중...', tokens: 45200, model: 'GLM-5-Turbo', device: 'Termux' },
-  { id: 'laika', name: '라이카', emoji: '🐕', role: 'PM', color: 'var(--agent-laika)', status: 'online', statusText: '문서 검토 중', tokens: 67100, model: 'GLM-5-Turbo', device: 'Termux' },
-  { id: 'xiaomi', name: '샤오미', emoji: '🤖', role: 'Backend', color: 'var(--agent-xiaomi)', status: 'error', statusText: 'exec 권한 없음', tokens: 38700, model: 'GLM-5-Turbo', device: 'Termux' },
-];
-
-const MOCK_TOOL_LOG = [
-  { agent: 'renover', tool: 'web_fetch', status: 'success', time: '2분 전', desc: 'raw.githubusercontent.com/read' },
-  { agent: 'xiaomi', tool: 'exec', status: 'error', time: '5분 전', desc: 'chmod +x (Permission denied)' },
-  { agent: 'laika', tool: 'web_search', status: 'success', time: '8분 전', desc: '"OpenClaw Gateway port scan"' },
-  { agent: 'renover', tool: 'edit', status: 'success', time: '12분 전', desc: 'DESIGN.md v2.1 업데이트' },
-  { agent: 'laika', tool: 'exec', status: 'success', time: '15분 전', desc: 'git pull --rebase && git push' },
-  { agent: 'xiaomi', tool: 'web_fetch', status: 'success', time: '18분 전', desc: 'Pollinations 이미지 생성' },
-  { agent: 'renover', tool: 'write', status: 'success', time: '20분 전', desc: 'chatub-v21-concept.html' },
-];
-
-const MOCK_ACTIVITY = [
-  { agent: 'renover', icon: '✏️', bg: 'rgba(167,139,250,0.15)', title: 'DESIGN.md v2.1 업데이트', desc: '관제탑 리브랜딩 문서 작성', time: '23:05' },
-  { agent: 'laika', icon: '📋', bg: 'rgba(249,115,22,0.15)', title: 'DESIGN.md v2.2 최종 편집', desc: '샤오미 역할 이관, 1차 목표 명시', time: '23:17' },
-  { agent: 'renover', icon: '🎨', bg: 'rgba(167,139,250,0.15)', title: 'v2.1 UI 컨셉 프로토타입', desc: '픽셀 오피스 + 채팅 + 대시보드', time: '01:38' },
-  { agent: 'renover', icon: '📊', bg: 'rgba(167,139,250,0.15)', title: 'Repo 분석 #8 완료', desc: 'OpenClaw-Office (New)', time: '11:50' },
-  { agent: 'laika', icon: '🔍', bg: 'rgba(249,115,22,0.15)', title: 'Gateway 포트 스캔 연구', desc: '내부망 OpenClaw 자동 발견', time: '23:21' },
-];
-
-const MOCK_SESSIONS = [
-  { id: 's1', agent: 'renover', route: 'telegram:-1003648180211:topic:117', messages: 142, time: '3시간 전' },
-  { id: 's2', agent: 'laika', route: 'telegram:-1003648180211:topic:117', messages: 98, time: '3시간 전' },
-  { id: 's3', agent: 'xiaomi', route: 'telegram:-1003648180211:topic:117', messages: 67, time: '3시간 전' },
-  { id: 's4', agent: 'renover', route: 'telegram:dm:57800993', messages: 23, time: '1일 전' },
-];
-
-const WEEKLY_DATA = [80, 45, 90, 30, 65, 55, 70];
-const WEEKLY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+// Agent metadata (for display, not from API)
+const AGENT_META = {
+  renover: { emoji: '😇', role: 'Frontend', color: 'var(--agent-lenovo)' },
+  laika:   { emoji: '🐕', role: 'PM', color: 'var(--agent-laika)' },
+  xiaomi:  { emoji: '🤖', role: 'Backend', color: 'var(--agent-xiaomi)' },
+};
 
 function renderControlTower() {
-  renderAgentCards();
-  renderCtrlTab();
-  renderTokenStats();
+  fetchGateways();
   renderWeeklyChart();
   renderAchievements();
 }
 
+async function fetchGateways() {
+  try {
+    const resp = await fetch('/api/gateways/');
+    const data = await resp.json();
+    if (data.ok) {
+      ctrlGateways = data.data || [];
+      renderControlTower();
+    }
+  } catch (e) {
+    console.error('[ControlTower] Failed to fetch gateways:', e);
+  }
+}
+
 function renderAgentCards() {
   const c = $('agent-status-cards');
-  c.innerHTML = MOCK_AGENTS.map(a => `
-    <div class="ctrl-agent-card" onclick="switchView('chat')">
-      <div class="ctrl-agent-avatar" style="background:${a.color}">${a.emoji}</div>
+  if (ctrlGateways.length === 0) {
+    c.innerHTML = `<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">📡</div>
+      등록된 Gateway가 없습니다<br>
+      <span style="font-size:11px;">에이전트 기기에서 /api/gateways/register 로 등록하세요</span>
+    </div>`;
+    return;
+  }
+  c.innerHTML = ctrlGateways.map(gw => {
+    const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: '', color: 'var(--accent)' };
+    const online = gw.health && gw.health.online;
+    const status = online ? 'online' : 'offline';
+    const statusText = online ? '연결됨' : '오프라인';
+    return `
+    <div class="ctrl-agent-card" onclick="ctrlHealthCheck('${gw.id}')">
+      <div class="ctrl-agent-avatar" style="background:${meta.color}">${meta.emoji}</div>
       <div class="ctrl-agent-info">
-        <div class="ctrl-agent-name">${a.name} <span style="font-size:10px;color:var(--text-muted);font-weight:400;">${a.role}</span></div>
-        <div class="ctrl-agent-status"><span class="dot ${a.status}"></span>${a.statusText}</div>
+        <div class="ctrl-agent-name">${escapeHtml(gw.name)} <span style="font-size:10px;color:var(--text-muted);font-weight:400;">${meta.role || 'Agent'}</span></div>
+        <div class="ctrl-agent-status"><span class="dot ${status}"></span>${statusText}<span style="margin-left:6px;font-size:10px;color:var(--text-muted);">${gw.url}</span></div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+}
+
+async function ctrlHealthCheck(gwId) {
+  try {
+    const resp = await fetch(`/api/gateways/${gwId}/health`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.ok) {
+      // Refresh the gateway list
+      const list = await fetch('/api/gateways/');
+      const ld = await list.json();
+      if (ld.ok) { ctrlGateways = ld.data || []; renderAgentCards(); }
+    }
+  } catch (e) {
+    console.error('[ControlTower] Health check failed:', e);
+  }
 }
 
 function switchCtrlTab(tab) {
@@ -4399,69 +4411,120 @@ function switchCtrlTab(tab) {
   renderCtrlTab();
 }
 
-function renderCtrlTab() {
+async function renderCtrlTab() {
   const c = $('ctrl-tab-content');
+  if (ctrlCurrentTab === 'sessions' || ctrlCurrentTab === 'tools') {
+    if (ctrlGateways.length === 0) {
+      c.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">Gateway가 연결되지 않았습니다</div>';
+      return;
+    }
+  }
   if (ctrlCurrentTab === 'activity') {
-    c.innerHTML = MOCK_ACTIVITY.map(a => {
-      const agent = MOCK_AGENTS.find(x => x.id === a.agent);
-      return `<div class="ctrl-activity-item">
-        <div class="ctrl-agent-avatar" style="background:${agent.color};width:32px;height:32px;font-size:16px;border-radius:8px;">${agent.emoji}</div>
-        <div class="ctrl-activity-text">
-          <div class="ctrl-activity-title">${a.title}</div>
-          <div class="ctrl-activity-desc">${a.desc}</div>
-        </div>
-        <div class="ctrl-activity-time">${a.time}</div>
-      </div>`;
-    }).join('');
+    renderActivityTab(c);
   } else if (ctrlCurrentTab === 'tools') {
-    c.innerHTML = MOCK_TOOL_LOG.map(t => {
-      const agent = MOCK_AGENTS.find(x => x.id === t.agent);
-      return `<div class="ctrl-tool-item">
-        <span class="ctrl-tool-icon">${agent.emoji}</span>
-        <span class="ctrl-tool-name">${t.tool}</span>
-        <span style="flex:1;color:var(--text-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.desc}</span>
-        <span class="ctrl-tool-status ${t.status}">${t.status === 'success' ? '✓' : t.status === 'running' ? '⟳' : '✗'}</span>
-        <span style="font-size:10px;color:var(--text-muted);">${t.time}</span>
-      </div>`;
-    }).join('');
+    await renderToolsTab(c);
   } else if (ctrlCurrentTab === 'sessions') {
-    c.innerHTML = MOCK_SESSIONS.map(s => {
-      const agent = MOCK_AGENTS.find(x => x.id === s.agent);
-      return `<div class="ctrl-session-item">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">${agent.emoji}</span>
-          <div>
-            <div style="font-size:13px;font-weight:600;">${agent.name}</div>
-            <div class="ctrl-session-route">${s.route}</div>
-          </div>
-          <span style="margin-left:auto;font-size:12px;color:var(--text-secondary);">${s.messages} msg</span>
-          <span class="ctrl-session-time">${s.time}</span>
-        </div>
-      </div>`;
-    }).join('');
+    await renderSessionsTab(c);
   }
 }
 
-function renderTokenStats() {
-  const total = MOCK_AGENTS.reduce((s, a) => s + a.tokens, 0);
-  $('ctrl-token-stats').innerHTML = MOCK_AGENTS.map(a => `
-    <div class="ctrl-token-row">
-      <span class="ctrl-token-label">${a.emoji} ${a.name}</span>
-      <span class="ctrl-token-value ${a.tokens > 60000 ? 'warn' : 'good'}">${(a.tokens/1000).toFixed(1)}K</span>
-    </div>
-  `).join('') + `
-    <div class="ctrl-token-row" style="border-top:1px solid var(--border-strong);padding-top:8px;margin-top:4px;">
-      <span class="ctrl-token-label" style="font-weight:700;">합계</span>
-      <span class="ctrl-token-value" style="color:var(--accent);">${(total/1000).toFixed(1)}K</span>
+function renderActivityTab(c) {
+  if (ctrlGateways.length === 0) {
+    c.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">Gateway가 연결되지 않았습니다</div>';
+    return;
+  }
+  c.innerHTML = ctrlGateways.map(gw => {
+    const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', color: 'var(--accent)' };
+    const online = gw.health && gw.health.online;
+    return `<div class="ctrl-activity-item">
+      <div class="ctrl-agent-avatar" style="background:${meta.color};width:32px;height:32px;font-size:16px;border-radius:8px;">${meta.emoji}</div>
+      <div class="ctrl-activity-text">
+        <div class="ctrl-activity-title">${escapeHtml(gw.name)} ${online ? '🟢 연결됨' : '🔴 오프라인'}</div>
+        <div class="ctrl-activity-desc">${escapeHtml(gw.url)}</div>
+      </div>
     </div>`;
+  }).join('');
+}
+
+async function renderToolsTab(c) {
+  // Fetch agents from each gateway
+  let allTools = [];
+  for (const gw of ctrlGateways) {
+    try {
+      const resp = await fetch(`/api/gateways/${gw.id}/agents`);
+      const data = await resp.json();
+      const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️' };
+      if (data.ok && data.data) {
+        allTools.push({ agent: gw.name, emoji: meta.emoji, tool: 'Gateway Query', status: 'success', desc: `${gw.url} — agents/models`, time: '방금' });
+      } else {
+        allTools.push({ agent: gw.name, emoji: meta.emoji, tool: 'Gateway Query', status: 'error', desc: data.error || '연결 실패', time: '방금' });
+      }
+    } catch (e) {
+      allTools.push({ agent: gw.name, emoji: '🖥️', tool: 'Gateway Query', status: 'error', desc: e.message, time: '방금' });
+    }
+  }
+  c.innerHTML = allTools.map(t => `
+    <div class="ctrl-tool-item">
+      <span class="ctrl-tool-icon">${t.emoji}</span>
+      <span class="ctrl-tool-name">${t.tool}</span>
+      <span style="flex:1;color:var(--text-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.desc)}</span>
+      <span class="ctrl-tool-status ${t.status}">${t.status === 'success' ? '✓' : '✗'}</span>
+    </div>
+  `).join('');
+}
+
+async function renderSessionsTab(c) {
+  let html = '';
+  for (const gw of ctrlGateways) {
+    const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️' };
+    try {
+      const resp = await fetch(`/api/gateways/${gw.id}/sessions`);
+      const data = await resp.json();
+      const note = data.data && data.data.note ? data.data.note : (data.ok ? '응답됨' : '실패');
+      html += `<div class="ctrl-session-item">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">${meta.emoji}</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;">${escapeHtml(gw.name)}</div>
+            <div class="ctrl-session-route">${escapeHtml(gw.url)}</div>
+          </div>
+          <span style="margin-left:auto;font-size:11px;color:${data.ok ? 'var(--success)' : 'var(--danger)'};">${escapeHtml(note)}</span>
+        </div>
+      </div>`;
+    } catch (e) {
+      html += `<div class="ctrl-session-item"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">${meta.emoji}</span><span style="font-size:13px;color:var(--danger);">연결 실패</span></div></div>`;
+    }
+  }
+  c.innerHTML = html || '<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">Gateway가 연결되지 않았습니다</div>';
+}
+
+function renderTokenStats() {
+  const online = ctrlGateways.filter(g => g.health && g.health.online).length;
+  const total = ctrlGateways.length;
+  $('ctrl-token-stats').innerHTML = `
+    <div class="ctrl-token-row">
+      <span class="ctrl-token-label">📡 온라인 Gateway</span>
+      <span class="ctrl-token-value ${online > 0 ? 'good' : 'warn'}">${online} / ${total}</span>
+    </div>
+    ${ctrlGateways.map(gw => {
+      const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️' };
+      const online = gw.health && gw.health.online;
+      return `<div class="ctrl-token-row">
+        <span class="ctrl-token-label">${meta.emoji} ${escapeHtml(gw.name)}</span>
+        <span class="ctrl-token-value ${online ? 'good' : ''}" style="${online ? '' : 'color:var(--text-muted)'}">${online ? '🟢' : '⚫'}</span>
+      </div>`;
+    }).join('')}`;
 }
 
 function renderWeeklyChart() {
-  const max = Math.max(...WEEKLY_DATA);
-  $('ctrl-weekly-chart').innerHTML = `<div class="ctrl-chart-bar">${WEEKLY_DATA.map((v, i) => `
+  // Placeholder chart — will be replaced by actual activity data
+  const days = ['월', '화', '수', '목', '금', '토', '일'];
+  const vals = ctrlGateways.length > 0 ? [3,5,2,8,4,1,6] : [0,0,0,0,0,0,0];
+  const max = Math.max(...vals, 1);
+  $('ctrl-weekly-chart').innerHTML = `<div class="ctrl-chart-bar">${vals.map((v, i) => `
     <div class="ctrl-chart-col">
       <div class="ctrl-chart-bar-inner" style="height:${(v/max)*100}%"></div>
-      <span class="ctrl-chart-label">${WEEKLY_LABELS[i]}</span>
+      <span class="ctrl-chart-label">${days[i]}</span>
     </div>
   `).join('')}</div>`;
 }
@@ -4470,7 +4533,7 @@ function renderAchievements() {
   $('ctrl-achievements').innerHTML = [
     { icon: '🏆', title: '8개 Repo 분석', desc: 'Top 8 완결' },
     { icon: '📝', title: '블로그 15편', desc: 'GitHub Pages' },
-    { icon: '🚀', title: 'Chatub v2.0', desc: '런칭' },
+    { icon: '🚀', title: 'Chatub v2.1', desc: '관제탑 런칭' },
     { icon: '🎨', title: '픽셀아트', desc: '갤러리 배포' },
     { icon: '🤝', title: '3에이전트', desc: '협업 시작' },
   ].map(a => `<div class="ctrl-badge" title="${a.desc}">${a.icon} ${a.title}</div>`).join('');
