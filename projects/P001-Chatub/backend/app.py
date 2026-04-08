@@ -243,6 +243,72 @@ async def handle_gateway_chat(request: Request):
         return JSONResponse(content={"error": str(e)}, status_code=502)
 
 
+# -- Broadcast chat to all online gateways --
+
+@app.post("/api/gateway-broadcast")
+async def handle_broadcast(request: Request):
+    """Send message to all online gateways, return all responses."""
+    body = await request.body()
+    data = json.loads(body)
+    gateway_id = data.pop("gateway_id", None)  # optional: specific gateway
+    broadcast = data.pop("broadcast", True)
+    log.info("▶ broadcast request: messages=%d, broadcast=%s, gateway_id=%s", len(data.get("messages", [])), broadcast, gateway_id)
+
+    from db import get_db
+    db = get_db()
+    try:
+        if gateway_id:
+            rows = db.execute("SELECT id, name, url, token FROM gateways WHERE id=?", (gateway_id,)).fetchall()
+        elif broadcast:
+            rows = db.execute("SELECT id, name, url, token FROM gateways").fetchall()
+        else:
+            # Default: only online gateways
+            rows = db.execute("SELECT id, name, url, token FROM gateways").fetchall()
+
+        results = []
+        for row in rows:
+            gw_url = row["url"]
+            gw_token = row["token"] or ""
+            gw_name = row["name"]
+            gw_id = row["id"]
+
+            headers = {"Content-Type": "application/json"}
+            if gw_token:
+                headers["Authorization"] = f"Bearer {gw_token}"
+
+            try:
+                req = urllib.request.Request(
+                    f"{gw_url}/v1/chat/completions",
+                    data=json.dumps(data).encode(),
+                    headers=headers,
+                    method="POST",
+                )
+                resp = urllib.request.urlopen(req, timeout=60)
+                result = resp.read()
+                parsed = json.loads(result)
+                content = ""
+                if parsed.get("choices"):
+                    content = parsed["choices"][0].get("message", {}).get("content", "")
+
+                results.append({"name": gw_name, "id": gw_id, "ok": True, "content": content})
+
+                # Log to DB
+                from db import new_id, now_ts
+                for m in data.get("messages", []):
+                    db.execute("INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,created_at) VALUES (?,?,?,?,?,?)",
+                        (new_id(), gw_id, gw_name, m.get("role","user"), m.get("content",""), now_ts()))
+                db.execute("INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,model,created_at) VALUES (?,?,?,?,?,?)",
+                    (new_id(), gw_id, gw_name, "assistant", content, parsed.get("model",""), now_ts()))
+                db.commit()
+
+            except Exception as e:
+                results.append({"name": gw_name, "id": gw_id, "ok": False, "error": str(e)})
+
+        return json_ok(results)
+    finally:
+        db.close()
+
+
 # -- Migration (localStorage -> DB) --
 
 @app.post("/api/migrate")

@@ -1225,6 +1225,12 @@ a { color: var(--accent); text-decoration: none; }
         <div class="typing-dots"><span></span><span></span><span></span></div>
         <span id="typing-text">생각 중...</span>
       </div>
+      <div id="agent-select-bar" style="display:none;padding:6px 12px;background:var(--bg-secondary);border-top:1px solid var(--border-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--text-muted);">에이전트:</span>
+        <select id="agent-select" style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:6px;padding:4px 8px;font-size:12px;"></select>
+        <button id="btn-broadcast" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;" title="모든 에이전트에게 전송">📡 모두에게</button>
+        <button id="btn-agent-toggle" style="background:none;border:1px solid var(--border-color);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text-muted);cursor:pointer;" title="에이전트 선택 표시/숨기기">🤖</button>
+      </div>
       <div class="input-container" style="position:relative;">
         <div class="mention-dropdown" id="mention-dropdown"></div>
         <div class="input-wrapper">
@@ -4542,8 +4548,65 @@ function renderAchievements() {
   ].map(a => `<div class="ctrl-badge" title="${a.desc}">${a.icon} ${a.title}</div>`).join('');
 }
 
+// ---- Agent Select Bar & Broadcast ----
+let selectedGatewayId = null;
+
+async function initAgentSelectBar() {
+  try {
+    const resp = await fetch('/api/gateways/');
+    const data = await resp.json();
+    if (!data.ok || !data.data.length) return;
+    const sel = $('agent-select');
+    sel.innerHTML = '<option value="">(기본: 로컬 Gateway)</option>' +
+      data.data.filter(g => g.health && g.health.online).map(g =>
+        `<option value="${g.id}">${escapeHtml(g.name)}</option>`
+      ).join('');
+    $('agent-select-bar').style.display = 'flex';
+    sel.onchange = () => { selectedGatewayId = sel.value || null; };
+    $('btn-broadcast').onclick = broadcastToAll;
+    $('btn-agent-toggle').onclick = () => {
+      const bar = $('agent-select-bar');
+      bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
+    };
+  } catch(e) { console.error('[AgentSelect]', e); }
+}
+
+async function broadcastToAll() {
+  const input = $('msg-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const container = $('messages-container');
+  // Show user message
+  container.innerHTML += `<div class="message user"><div class="message-content">📡 모두에게: ${escapeHtml(text)}</div></div>`;
+  container.scrollTop = container.scrollHeight;
+  try {
+    const resp = await fetch('/api/gateway-broadcast', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ messages: [{ role: 'user', content: text }], broadcast: true })
+    });
+    const data = await resp.json();
+    if (data.ok && data.data) {
+      for (const r of data.data) {
+        const cls = r.ok ? 'bot' : 'bot';
+        const content = r.ok ? r.content : `❌ ${r.error}`;
+        const meta = AGENT_META[(r.name || '').toLowerCase()] || { emoji: '🖥️' };
+        container.innerHTML += `<div class="message bot"><div class="message-content"><span style="font-size:16px;">${meta.emoji}</span> <strong>${escapeHtml(r.name)}</strong>: ${escapeHtml(content)}</div></div>`;
+      }
+      container.scrollTop = container.scrollHeight;
+    }
+  } catch(e) {
+    container.innerHTML += `<div class="message bot"><div class="message-content" style="color:var(--danger)">전송 실패: ${escapeHtml(e.message)}</div></div>`;
+  }
+}
+
+// Override callAI to use selected gateway
+const _origCallAI = typeof callAI !== 'undefined' ? callAI : null;
+
 // Start
 init();
+setTimeout(initAgentSelectBar, 2000);
 
 // ---- Chat Logs Tab ----
 async function renderChatLogsTab(c) {
