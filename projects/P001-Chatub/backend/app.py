@@ -129,15 +129,37 @@ log = logging.getLogger("gateway-chat")
 
 @app.post("/api/gateway-chat")
 async def handle_gateway_chat(request: Request):
-    """Proxy chat to OpenClaw Gateway /v1/chat/completions, return SSE stream."""
+    """Proxy chat to any registered Gateway /v1/chat/completions, return SSE stream.
+    Supports multi-gateway: specify gateway_id to route to a specific gateway.
+    Falls back to default (localhost) Gateway if no gateway_id provided.
+    """
     body = await request.body()
     data = json.loads(body)
-    log.info("▶ request received: messages=%d", len(data.get("messages", [])))
+    gateway_id = data.pop("gateway_id", None)
+    log.info("▶ request received: messages=%d, gateway_id=%s", len(data.get("messages", [])), gateway_id)
+
+    # Resolve gateway URL and token
+    gw_url = GW_BASE_URL
+    gw_token = GW_TOKEN
+
+    if gateway_id:
+        from db import get_db
+        db = get_db()
+        try:
+            gw = db.execute("SELECT url, token FROM gateways WHERE id=?", (gateway_id,)).fetchone()
+            if gw:
+                gw_url = gw["url"]
+                gw_token = gw["token"] or ""
+                log.info("▶ routing to gateway: %s (%s)", gateway_id, gw_url)
+            else:
+                return JSONResponse({"ok": False, "error": f"Gateway {gateway_id} not found"}, status_code=404)
+        finally:
+            db.close()
 
     headers = {"Content-Type": "application/json"}
-    if GW_TOKEN:
-        headers["Authorization"] = f"Bearer {GW_TOKEN}"
-        log.info("▶ using token: ...%s", GW_TOKEN[-6:])
+    if gw_token:
+        headers["Authorization"] = f"Bearer {gw_token}"
+        log.info("▶ using token: ...%s", gw_token[-6:])
     else:
         log.info("▶ no token configured")
 
@@ -145,7 +167,7 @@ async def handle_gateway_chat(request: Request):
     if is_stream:
         data["stream"] = True
 
-    target = f"{GW_BASE_URL}/v1/chat/completions"
+    target = f"{gw_url}/v1/chat/completions"
     log.info("▶ proxying to %s (stream=%s)", target, is_stream)
 
     try:
@@ -178,8 +200,33 @@ async def handle_gateway_chat(request: Request):
         else:
             result = resp.read()
             log.info("▶ Gateway response body: %s", result[:500])
-            return JSONResponse(
-                content=json.loads(result),
+            parsed = json.loads(result)
+
+            # Log chat to DB
+            try:
+                from db import get_db, new_id, now_ts
+                db = get_db()
+                msgs = data.get("messages", [])
+                for m in msgs:
+                    db.execute(
+                        "INSERT INTO chat_logs (id, gateway_id, gateway_name, role, content, created_at) VALUES (?,?,?,?,?,?)",
+                        (new_id(), gateway_id or "default", "", m.get("role", "user"), m.get("content", ""), now_ts())
+                    )
+                # Log assistant response
+                choices = parsed.get("choices", [])
+                if choices:
+                    aid = choices[0].get("message", {}).get("content", "")
+                    usage = parsed.get("usage", {})
+                    db.execute(
+                        "INSERT INTO chat_logs (id, gateway_id, gateway_name, role, content, model, tokens_prompt, tokens_completion, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                        (new_id(), gateway_id or "default", "", "assistant", aid, parsed.get("model", ""), usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), now_ts())
+                    )
+                db.commit()
+                db.close()
+            except Exception as e:
+                log.warning("▶ chat log save failed: %s", e)
+
+            return JSONResponse(content=parsed,
                 headers={"Cache-Control": "no-cache"},
             )
 

@@ -178,15 +178,62 @@ async def get_gateway_sessions(gateway_id: str):
         if not gw:
             return {"ok": False, "error": "Gateway not found"}
 
-        # Try to get session info from gateway
         data = _query_gateway(gw["url"], gw["token"], "/api/sessions")
         if data is None:
-            data = _query_gateway(gw["url"], gw["token"], "/v1/chat/completions")
+            data = _query_gateway(gw["url"], gw["token"], "/v1/models")
             if data is None:
                 return {"ok": False, "error": "Gateway unreachable"}
-            return {"ok": True, "data": {"note": "sessions endpoint not available, gateway is online"}}
+            return {"ok": True, "data": {"note": "sessions endpoint not available", "status": "online"}}
 
         return {"ok": True, "data": data}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
+@router.get("/{gateway_id}/history")
+async def get_gateway_history(gateway_id: str, limit: int = 20):
+    """Get chat history from a specific gateway."""
+    db = get_db()
+    try:
+        gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
+        if not gw:
+            return {"ok": False, "error": "Gateway not found"}
+
+        data = _query_gateway(gw["url"], gw["token"], "/api/history?limit=" + str(limit))
+        if data is not None:
+            return {"ok": True, "data": data}
+
+        data = _query_gateway(gw["url"], gw["token"], "/v1/models")
+        if data is None:
+            return {"ok": False, "error": "Gateway unreachable"}
+
+        return {"ok": True, "data": {"note": "history endpoint not available", "models": data}}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
+@router.get("/chat-logs")
+async def get_chat_logs(gateway_id: str = None, limit: int = 50):
+    """Get chat logs from local DB, optionally filtered by gateway_id."""
+    db = get_db()
+    try:
+        if gateway_id:
+            rows = db.execute(
+                "SELECT id, gateway_id, gateway_name, role, content, model, tokens_prompt, tokens_completion, created_at FROM chat_logs WHERE gateway_id=? ORDER BY created_at DESC LIMIT ?",
+                (gateway_id, limit)
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT id, gateway_id, gateway_name, role, content, model, tokens_prompt, tokens_completion, created_at FROM chat_logs ORDER BY created_at DESC LIMIT ?",
+                (limit,)
+            ).fetchall()
+        logs = [dict(r) for r in rows]
+        logs.reverse()
+        return {"ok": True, "data": logs}
     except Exception as e:
         return {"ok": False, "error": str(e)}
     finally:
