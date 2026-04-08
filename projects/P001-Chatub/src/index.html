@@ -1225,7 +1225,7 @@ a { color: var(--accent); text-decoration: none; }
         <div class="typing-dots"><span></span><span></span><span></span></div>
         <span id="typing-text">생각 중...</span>
       </div>
-      <div id="agent-select-bar" style="display:none;padding:6px 12px;background:var(--bg-secondary);border-top:1px solid var(--border-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div id="agent-select-bar" style="padding:6px 12px;background:var(--bg-secondary);border-top:1px solid var(--border-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-size:12px;color:var(--text-muted);">에이전트:</span>
         <select id="agent-select" style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:6px;padding:4px 8px;font-size:12px;"></select>
         <button id="btn-broadcast" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;" title="모든 에이전트에게 전송">📡 모두에게</button>
@@ -2080,9 +2080,12 @@ function sendMessage(text, image) {
     const bot = proj.bots.find(b => b.active && b.name.toLowerCase() === botName.toLowerCase());
     if (bot) {
       callAI(bot, text, ch);
+      return;
     }
   }
-}
+
+  // Default: broadcast to all gateways
+  broadcastToChat(text, ch);
 
 function deleteMessage(msgId) {
   if (!isGuestMode) {
@@ -4576,10 +4579,11 @@ async function broadcastToAll() {
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
+  broadcastToChat(text, null);
+}
+
+async function broadcastToChat(text, channel) {
   const container = $('messages-container');
-  // Show user message
-  container.innerHTML += `<div class="message user"><div class="message-content">📡 모두에게: ${escapeHtml(text)}</div></div>`;
-  container.scrollTop = container.scrollHeight;
   try {
     const resp = await fetch('/api/gateway-broadcast', {
       method: 'POST',
@@ -4589,15 +4593,23 @@ async function broadcastToAll() {
     const data = await resp.json();
     if (data.ok && data.data) {
       for (const r of data.data) {
-        const cls = r.ok ? 'bot' : 'bot';
-        const content = r.ok ? r.content : `❌ ${r.error}`;
+        if (!r.ok) continue;
         const meta = AGENT_META[(r.name || '').toLowerCase()] || { emoji: '🖥️' };
-        container.innerHTML += `<div class="message bot"><div class="message-content"><span style="font-size:16px;">${meta.emoji}</span> <strong>${escapeHtml(r.name)}</strong>: ${escapeHtml(content)}</div></div>`;
+        const aiMsg = {
+          id: uid(), authorId: r.id, author: r.name, text: r.content,
+          ts: Date.now(), isBot: true, reactions: {}, replies: [],
+        };
+        if (channel) {
+          channel.messages.push(aiMsg);
+          renderMessages();
+        } else {
+          container.innerHTML += `<div class="message bot"><div class="message-content"><span style="font-size:16px;">${meta.emoji}</span> <strong>${escapeHtml(r.name)}</strong>: ${escapeHtml(r.content)}</div></div>`;
+          container.scrollTop = container.scrollHeight;
+        }
       }
-      container.scrollTop = container.scrollHeight;
     }
   } catch(e) {
-    container.innerHTML += `<div class="message bot"><div class="message-content" style="color:var(--danger)">전송 실패: ${escapeHtml(e.message)}</div></div>`;
+    console.error('[Broadcast]', e);
   }
 }
 
