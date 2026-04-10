@@ -3,6 +3,8 @@
 import json
 import urllib.request
 import urllib.error
+import asyncio
+import httpx
 
 from pathlib import Path
 
@@ -265,46 +267,34 @@ async def handle_broadcast(request: Request):
             # Default: only online gateways
             rows = db.execute("SELECT id, name, url, token FROM gateways").fetchall()
 
-        results = []
-        for row in rows:
-            gw_url = row["url"]
-            gw_token = row["token"] or ""
-            gw_name = row["name"]
-            gw_id = row["id"]
-
+        async def query_one(gw):
+            gw_url, gw_token, gw_name, gw_id = gw["url"], gw["token"] or "", gw["name"], gw["id"]
             headers = {"Content-Type": "application/json"}
             if gw_token:
                 headers["Authorization"] = f"Bearer {gw_token}"
-
             try:
-                req = urllib.request.Request(
-                    f"{gw_url}/v1/chat/completions",
-                    data=json.dumps(data).encode(),
-                    headers=headers,
-                    method="POST",
-                )
-                resp = urllib.request.urlopen(req, timeout=60)
-                result = resp.read()
-                parsed = json.loads(result)
-                content = ""
-                if parsed.get("choices"):
-                    content = parsed["choices"][0].get("message", {}).get("content", "")
-
-                results.append({"name": gw_name, "id": gw_id, "ok": True, "content": content})
-
-                # Log to DB
-                from db import new_id, now_ts
-                for m in data.get("messages", []):
-                    db.execute("INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,created_at) VALUES (?,?,?,?,?,?)",
-                        (new_id(), gw_id, gw_name, m.get("role","user"), m.get("content",""), now_ts()))
-                db.execute("INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,model,created_at) VALUES (?,?,?,?,?,?)",
-                    (new_id(), gw_id, gw_name, "assistant", content, parsed.get("model",""), now_ts()))
-                db.commit()
-
+                async with httpx.AsyncClient(timeout=30) as client:
+                    resp = await client.post(f"{gw_url}/v1/chat/completions", json=data, headers=headers)
+                    resp.raise_for_status()
+                    parsed = resp.json()
+                    content = parsed.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    usage = parsed.get("usage", {})
+                    # Log to DB
+                    for m in data.get("messages", []):
+                        db.execute(
+                            "INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,created_at) VALUES (?,?,?,?,?,?)",
+                            (new_id(), gw_id, gw_name, m.get("role","user"), m.get("content",""), now_ts()))
+                    db.execute(
+                        "INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,model,tokens_prompt,tokens_completion,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                        (new_id(), gw_id, gw_name, "assistant", content, parsed.get("model",""), usage.get("prompt_tokens",0), usage.get("completion_tokens",0), now_ts()))
+                    db.commit()
+                    return {"name": gw_name, "id": gw_id, "ok": True, "content": content, "model": parsed.get("model",""), "usage": usage}
             except Exception as e:
-                results.append({"name": gw_name, "id": gw_id, "ok": False, "error": str(e)})
+                log.warning("▶ broadcast to %s (%s) failed: %s", gw_name, gw_url, e)
+                return {"name": gw_name, "id": gw_id, "ok": False, "error": str(e)}
 
-        return json_ok(results)
+        results = await asyncio.gather(*[query_one(row) for row in rows])
+        return json_ok(list(results))
     finally:
         db.close()
 
