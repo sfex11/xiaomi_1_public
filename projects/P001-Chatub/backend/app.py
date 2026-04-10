@@ -294,7 +294,13 @@ async def handle_broadcast(request: Request):
                 return {"name": gw_name, "id": gw_id, "ok": False, "error": str(e)}
 
         results = await asyncio.gather(*[query_one(row) for row in rows])
-        return json_ok(list(results))
+        result_list = list(results)
+
+        # Push broadcast results to /ws/status subscribers
+        from routers.ws import status_manager
+        await status_manager.push("broadcast", {"results": result_list})
+
+        return json_ok(result_list)
     finally:
         db.close()
 

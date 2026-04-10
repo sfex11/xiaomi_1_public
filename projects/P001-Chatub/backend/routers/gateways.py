@@ -11,6 +11,9 @@ from db import get_db, new_id, now_ts, row_to_dict, rows_to_list
 router = APIRouter(prefix="/api/gateways", tags=["gateways"])
 log = logging.getLogger("gateways")
 
+# Agent states: idle, working, speaking, tool_calling, error
+AGENT_STATES = ("idle", "working", "speaking", "tool_calling", "error")
+
 
 def _query_gateway(gw_url, gw_token, path="/"):
     """Call an OpenClaw Gateway API endpoint. Returns parsed JSON or None."""
@@ -20,18 +23,52 @@ def _query_gateway(gw_url, gw_token, path="/"):
         headers["Authorization"] = f"Bearer {gw_token}"
     try:
         req = urllib.request.Request(url, headers=headers, method="GET")
-        resp = urllib.request.urlopen(req, timeout=10)
+        resp = urllib.request.urlopen(req, timeout=3)
         return json.loads(resp.read())
     except Exception as e:
         log.warning("Gateway query failed: %s %s → %s", gw_url, path, e)
         return None
 
 
+def _classify_agent_state(gw_url, gw_token, online):
+    """Classify agent state into one of 5 states based on gateway activity."""
+    if not online:
+        return "error"
+
+    # Try /api/sessions to detect active work
+    sessions = _query_gateway(gw_url, gw_token, "/api/sessions")
+    if sessions is None:
+        return "idle"
+
+    # Check session list for activity indicators
+    active_sessions = []
+    if isinstance(sessions, list):
+        active_sessions = sessions
+    elif isinstance(sessions, dict):
+        active_sessions = sessions.get("data", sessions.get("sessions", []))
+
+    if not active_sessions:
+        return "idle"
+
+    for sess in active_sessions:
+        if not isinstance(sess, dict):
+            continue
+        status = sess.get("status", "").lower()
+        if "tool" in status:
+            return "tool_calling"
+        if status in ("generating", "speaking", "streaming"):
+            return "speaking"
+        if status in ("working", "processing", "running"):
+            return "working"
+
+    return "working"
+
+
 def _health_check(gw):
-    """Check if a gateway is reachable. Returns status dict."""
+    """Check if a gateway is reachable. Returns status dict with agent state."""
     gw_url = gw["url"]
     gw_token = gw["token"]
-    result = {"online": False, "version": None, "agents": None}
+    result = {"online": False, "version": None, "agents": None, "state": "error"}
 
     # Try /v1/models as a lightweight health check
     data = _query_gateway(gw_url, gw_token, "/v1/models")
@@ -40,6 +77,7 @@ def _health_check(gw):
         if isinstance(data, dict):
             result["version"] = data.get("object", "ok")
 
+    result["state"] = _classify_agent_state(gw_url, gw_token, result["online"])
     return result
 
 
