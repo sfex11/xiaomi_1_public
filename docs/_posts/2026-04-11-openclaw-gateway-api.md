@@ -1,5 +1,6 @@
 ---
 layout: page
+permalink: /openclaw-gateway-api/
 title: "OpenClaw Gateway API 완전 가이드"
 category: 기술토론
 ---

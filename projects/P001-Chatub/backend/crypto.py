@@ -31,6 +31,17 @@ def encrypt(plaintext: str) -> str:
     return base64.b64encode(xored).decode("ascii")
 
 
+def is_encrypted(value: str) -> bool:
+    """Check if a value looks like our base64-encoded ciphertext."""
+    if not value:
+        return False
+    try:
+        decoded = base64.b64decode(value)
+        return len(decoded) > 4  # plaintext tokens are usually shorter when b64-decoded fails
+    except Exception:
+        return False
+
+
 def decrypt(ciphertext: str) -> str:
     if not ciphertext:
         return ""
