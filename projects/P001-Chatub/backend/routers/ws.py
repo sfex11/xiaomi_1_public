@@ -27,11 +27,12 @@ import asyncio
 import logging
 from typing import Dict, List, Set
 
+import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from starlette.websockets import WebSocketState
 
 from auth import verify_token
-from db import get_db, owns_project, project_for_channel
+from db import get_db, new_id, now_ts, owns_project, project_for_channel
 
 router = APIRouter()
 log = logging.getLogger("ws")
@@ -294,5 +295,189 @@ async def ws_rpc(ws: WebSocket):
                 log.warning("rpc %s error: %s", method, e)
                 await ws.send_text(json.dumps(
                     {"id": req_id, "error": str(e)}, ensure_ascii=False))
+    except WebSocketDisconnect:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Streaming chat relay — /ws/chat
+# SSE → WebSocket: Gateway streaming responses relayed in real-time
+# ---------------------------------------------------------------------------
+
+async def _stream_one_gateway(ws: WebSocket, gw_id: str, gw_name: str,
+                              gw_url: str, gw_token: str, payload: dict):
+    """Stream SSE from a single Gateway and relay chunks over WebSocket.
+
+    Sends:
+      {"type":"chat.chunk","gateway_id":"...","content":"..."}
+      {"type":"chat.done","gateway_id":"...","full":"전체응답"}
+    Returns (gw_id, gw_name, full_content, model, usage) or raises.
+    """
+    headers = {"Content-Type": "application/json"}
+    if gw_token:
+        headers["Authorization"] = f"Bearer {gw_token}"
+
+    full_content = ""
+    model = ""
+    usage = {}
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120, connect=10)) as client:
+        async with client.stream(
+            "POST", f"{gw_url}/v1/chat/completions",
+            json={**payload, "stream": True}, headers=headers,
+        ) as resp:
+            resp.raise_for_status()
+            buf = ""
+            async for raw in resp.aiter_text():
+                buf += raw
+                while "\n" in buf:
+                    line, buf = buf.split("\n", 1)
+                    line = line.strip()
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data_str = line[len("data:"):].strip()
+                    if data_str == "[DONE]":
+                        continue
+                    try:
+                        chunk = json.loads(data_str)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    delta = (chunk.get("choices") or [{}])[0].get("delta", {})
+                    content = delta.get("content", "")
+                    if not model:
+                        model = chunk.get("model", "")
+                    if chunk.get("usage"):
+                        usage = chunk["usage"]
+                    if content:
+                        full_content += content
+                        await ws.send_text(json.dumps({
+                            "type": "chat.chunk",
+                            "gateway_id": gw_id,
+                            "content": content,
+                        }, ensure_ascii=False))
+
+    await ws.send_text(json.dumps({
+        "type": "chat.done",
+        "gateway_id": gw_id,
+        "full": full_content,
+    }, ensure_ascii=False))
+
+    return gw_id, gw_name, full_content, model, usage
+
+
+def _save_chat_log(gw_id: str, gw_name: str, messages: list,
+                   assistant_content: str, model: str, usage: dict):
+    """Save user messages + assistant response to chat_logs."""
+    try:
+        db = get_db()
+        try:
+            for m in messages:
+                db.execute(
+                    "INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,created_at) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (new_id(), gw_id, gw_name, m.get("role", "user"),
+                     m.get("content", ""), now_ts()))
+            db.execute(
+                "INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,model,"
+                "tokens_prompt,tokens_completion,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                (new_id(), gw_id, gw_name, "assistant", assistant_content, model,
+                 usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), now_ts()))
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        log.warning("chat log save failed for %s: %s", gw_id, e)
+
+
+@router.websocket("/ws/chat")
+async def ws_chat(ws: WebSocket):
+    """Streaming chat relay: SSE → WebSocket.
+
+    Client sends:
+      Single:    {"messages":[...],"gateway_id":"xxx","stream":true}
+      Broadcast: {"messages":[...],"broadcast":true,"stream":true}
+
+    Server pushes:
+      {"type":"chat.chunk","gateway_id":"xxx","content":"..."}
+      {"type":"chat.done","gateway_id":"xxx","full":"전체응답"}
+      {"type":"chat.error","gateway_id":"xxx","error":"..."}
+    """
+    await ws.accept()
+    try:
+        while True:
+            raw = await ws.receive_text()
+            try:
+                msg = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                await ws.send_text(json.dumps(
+                    {"type": "chat.error", "gateway_id": "", "error": "invalid JSON"},
+                    ensure_ascii=False))
+                continue
+
+            messages = msg.get("messages", [])
+            gateway_id = msg.get("gateway_id")
+            broadcast = msg.get("broadcast", False)
+
+            if not messages:
+                await ws.send_text(json.dumps(
+                    {"type": "chat.error", "gateway_id": "", "error": "messages required"},
+                    ensure_ascii=False))
+                continue
+
+            db = get_db()
+            try:
+                if gateway_id:
+                    rows = db.execute(
+                        "SELECT id, name, url, token FROM gateways WHERE id=?",
+                        (gateway_id,)).fetchall()
+                    if not rows:
+                        await ws.send_text(json.dumps(
+                            {"type": "chat.error", "gateway_id": gateway_id,
+                             "error": f"Gateway {gateway_id} not found"},
+                            ensure_ascii=False))
+                        continue
+                elif broadcast:
+                    rows = db.execute(
+                        "SELECT id, name, url, token FROM gateways").fetchall()
+                    if not rows:
+                        await ws.send_text(json.dumps(
+                            {"type": "chat.error", "gateway_id": "",
+                             "error": "No gateways registered"},
+                            ensure_ascii=False))
+                        continue
+                else:
+                    await ws.send_text(json.dumps(
+                        {"type": "chat.error", "gateway_id": "",
+                         "error": "gateway_id or broadcast required"},
+                        ensure_ascii=False))
+                    continue
+            finally:
+                db.close()
+
+            payload = {k: v for k, v in msg.items()
+                       if k not in ("gateway_id", "broadcast", "stream")}
+
+            async def _relay(gw):
+                gid, gname = gw["id"], gw["name"]
+                try:
+                    result = await _stream_one_gateway(
+                        ws, gid, gname, gw["url"], gw["token"] or "", payload)
+                    _save_chat_log(gid, gname, messages,
+                                   result[2], result[3], result[4])
+                except httpx.HTTPStatusError as e:
+                    log.warning("stream to %s failed: HTTP %d", gname, e.response.status_code)
+                    await ws.send_text(json.dumps({
+                        "type": "chat.error", "gateway_id": gid,
+                        "error": f"HTTP {e.response.status_code}",
+                    }, ensure_ascii=False))
+                except Exception as e:
+                    log.warning("stream to %s failed: %s", gname, e)
+                    await ws.send_text(json.dumps({
+                        "type": "chat.error", "gateway_id": gid,
+                        "error": str(e),
+                    }, ensure_ascii=False))
+
+            await asyncio.gather(*[_relay(row) for row in rows])
+
     except WebSocketDisconnect:
         pass
