@@ -519,6 +519,21 @@ a { color: var(--accent); text-decoration: none; }
   transition: all var(--transition);
 }
 .ctrl-agent-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+
+.ctrl-cap-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.ctrl-cap-badge.on { background: rgba(52,199,89,0.15); color: var(--success); }
+.ctrl-cap-badge.off { background: var(--bg-secondary); color: var(--text-muted); opacity: 0.5; }
+.ctrl-cap-row { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+
 .ctrl-agent-avatar {
   width: 44px; height: 44px; border-radius: 12px; display: flex;
   align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;
@@ -4407,6 +4422,21 @@ async function fetchGateways() {
   }
 }
 
+
+function renderCapBadges(gw) {
+  var caps = (gw.health && gw.health.capabilities) || {};
+  var items = [
+    { key: 'chat', label: '\ud83d\udcac' },
+    { key: 'streaming', label: '\ud83d\udce1' },
+    { key: 'tools', label: '\ud83d\udd27' },
+    { key: 'sessions', label: '\ud83d\udcbb' },
+    { key: 'models', label: '\ud83e\udde0' },
+  ];
+  return items.map(function(i) {
+    var on = !!caps[i.key];
+    return '<span class="ctrl-cap-badge ' + (on ? 'on' : 'off') + '" title="' + i.key + '">' + i.label + '</span>';
+  }).join('');
+}
 function renderAgentCards() {
   const c = $('agent-status-cards');
   if (ctrlGateways.length === 0) {
@@ -4428,6 +4458,7 @@ function renderAgentCards() {
       <div class="ctrl-agent-info">
         <div class="ctrl-agent-name">${escapeHtml(gw.name)} <span style="font-size:10px;color:var(--text-muted);font-weight:400;">${meta.role || 'Agent'}</span></div>
         <div class="ctrl-agent-status"><span class="dot ${status}"></span>${statusText}<span style="margin-left:6px;font-size:10px;color:var(--text-muted);">${gw.url}</span></div>
+        <div class="ctrl-cap-row">${renderCapBadges(gw)}</div>
       </div>
     </div>`;
   }).join('');
