@@ -1,4 +1,26 @@
-"""WebSocket real-time chat + status monitoring for channels."""
+"""WebSocket real-time chat + status monitoring for channels.
+
+# ─── Reconnection guide (exponential backoff) ───────────────────────
+# Clients SHOULD implement exponential backoff when reconnecting to
+# /ws/status or /ws/rpc after an unexpected disconnect:
+#
+#   MAX_ATTEMPTS = 20
+#   BASE         = 1          # seconds
+#   MAX_DELAY    = 30         # seconds
+#
+#   attempt = 0
+#   while attempt < MAX_ATTEMPTS:
+#       delay = min(BASE * (2 ** attempt), MAX_DELAY)
+#       sleep(delay + random(0, delay * 0.1))   # jitter
+#       try:
+#           ws = connect(url)
+#           attempt = 0                          # reset on success
+#       except:
+#           attempt += 1
+#
+# This avoids thundering-herd reconnect storms when the server restarts.
+# ─────────────────────────────────────────────────────────────────────
+"""
 
 import json
 import asyncio
@@ -169,3 +191,108 @@ async def ws_status(ws: WebSocket):
         pass
     finally:
         status_manager.disconnect(ws)
+
+
+# ---------------------------------------------------------------------------
+# RPC WebSocket — /ws/rpc
+# Request:  {"method":"agents.list","id":"req-1","params":{}}
+# Response: {"id":"req-1","data":[...]}  or  {"id":"req-1","error":"..."}
+# ---------------------------------------------------------------------------
+
+_RPC_TIMEOUT = 10  # seconds
+
+# Method registry — each entry is an async callable(params) -> data
+_RPC_METHODS: Dict[str, object] = {}
+
+
+def _register_rpc_methods():
+    """Populate the RPC method table (called once at module load)."""
+    from routers.gateways import _health_check
+
+    async def agents_list(params):
+        """Return all gateways with health + agent state."""
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT id, name, url, token FROM gateways ORDER BY name"
+            ).fetchall()
+            result = []
+            for row in rows:
+                health = _health_check(row)
+                result.append({
+                    "id": row["id"],
+                    "name": row["name"],
+                    "online": health["online"],
+                    "state": health["state"],
+                    "version": health.get("version"),
+                })
+            return result
+        finally:
+            db.close()
+
+    async def gateways_stats(params):
+        """Return token usage stats (daily/per-gateway)."""
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT gateway_id, gateway_name, "
+                "date(created_at, 'unixepoch') AS day, "
+                "SUM(tokens_prompt) AS prompt_tokens, "
+                "SUM(tokens_completion) AS completion_tokens, "
+                "COUNT(*) AS messages "
+                "FROM chat_logs "
+                "GROUP BY gateway_id, day ORDER BY day DESC LIMIT 200"
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            db.close()
+
+    _RPC_METHODS["agents.list"] = agents_list
+    _RPC_METHODS["gateways.stats"] = gateways_stats
+
+
+_register_rpc_methods()
+
+
+@router.websocket("/ws/rpc")
+async def ws_rpc(ws: WebSocket):
+    """JSON-RPC-style WebSocket endpoint.
+
+    Send: {"method":"agents.list","id":"req-1"}
+    Recv: {"id":"req-1","data":[...]}
+    Timeout: 10 seconds per request.
+    """
+    await ws.accept()
+    try:
+        while True:
+            raw = await ws.receive_text()
+            try:
+                msg = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                await ws.send_text(json.dumps(
+                    {"id": None, "error": "invalid JSON"}, ensure_ascii=False))
+                continue
+
+            req_id = msg.get("id")
+            method = msg.get("method", "")
+            params = msg.get("params", {})
+
+            handler = _RPC_METHODS.get(method)
+            if handler is None:
+                await ws.send_text(json.dumps(
+                    {"id": req_id, "error": f"unknown method: {method}"}, ensure_ascii=False))
+                continue
+
+            try:
+                data = await asyncio.wait_for(handler(params), timeout=_RPC_TIMEOUT)
+                await ws.send_text(json.dumps(
+                    {"id": req_id, "data": data}, ensure_ascii=False))
+            except asyncio.TimeoutError:
+                await ws.send_text(json.dumps(
+                    {"id": req_id, "error": "timeout"}, ensure_ascii=False))
+            except Exception as e:
+                log.warning("rpc %s error: %s", method, e)
+                await ws.send_text(json.dumps(
+                    {"id": req_id, "error": str(e)}, ensure_ascii=False))
+    except WebSocketDisconnect:
+        pass

@@ -132,9 +132,30 @@ async def register_gateway(request: Request):
         db.close()
 
 
+@router.get("/stats")
+async def gateway_stats():
+    """Aggregate daily/per-gateway token usage from chat_logs."""
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT gateway_id, gateway_name, "
+            "date(created_at, 'unixepoch') AS day, "
+            "SUM(tokens_prompt) AS prompt_tokens, "
+            "SUM(tokens_completion) AS completion_tokens, "
+            "COUNT(*) AS messages "
+            "FROM chat_logs "
+            "GROUP BY gateway_id, day ORDER BY day DESC LIMIT 200"
+        ).fetchall()
+        return {"ok": True, "data": [dict(r) for r in rows]}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
 @router.get("/")
 async def list_gateways():
-    """List all registered gateways with health status."""
+    """List all registered gateways with health status and token stats."""
     db = get_db()
     try:
         rows = db.execute("SELECT id, name, url, created_at, updated_at FROM gateways ORDER BY name").fetchall()
@@ -145,6 +166,19 @@ async def list_gateways():
             full = db.execute("SELECT * FROM gateways WHERE id=?", (row["id"],)).fetchone()
             health = _health_check(full)
             gw["health"] = health
+            # Token usage stats for this gateway
+            stats = db.execute(
+                "SELECT SUM(tokens_prompt) AS prompt_tokens, "
+                "SUM(tokens_completion) AS completion_tokens, "
+                "COUNT(*) AS messages "
+                "FROM chat_logs WHERE gateway_id=?",
+                (row["id"],)
+            ).fetchone()
+            gw["stats"] = {
+                "prompt_tokens": (stats["prompt_tokens"] or 0) if stats else 0,
+                "completion_tokens": (stats["completion_tokens"] or 0) if stats else 0,
+                "messages": (stats["messages"] or 0) if stats else 0,
+            }
             gateways.append(gw)
         return {"ok": True, "data": gateways}
     except Exception as e:
