@@ -379,7 +379,7 @@ async def serve_index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
-@app.get("/register")
+@app.get("/register1")
 async def serve_register():
     return FileResponse(STATIC_DIR / "register.html")
 
