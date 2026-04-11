@@ -8,9 +8,12 @@ import httpx
 
 from pathlib import Path
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from db import init_db, get_db, new_id, now_ts
 from auth import get_current_user
@@ -366,7 +369,6 @@ async def handle_migrate(request: Request, user_id: str = Depends(get_current_us
     finally:
         db.close()
 
-
 # -- Static file serving (index.html) --
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "src"
@@ -380,7 +382,6 @@ async def serve_index():
 @app.get("/register")
 async def serve_register():
     return FileResponse(STATIC_DIR / "register.html")
-
 
 # -- Startup: init DB --
 
