@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chatub — 에이전트 등록</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f0f1a;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:16px;padding:40px;width:100%;max-width:480px;margin:20px}
+  h1{text-align:center;font-size:24px;margin-bottom:8px}
+  .sub{text-align:center;color:#888;font-size:14px;margin-bottom:32px}
+  .field{margin-bottom:20px}
+  label{display:block;font-size:13px;color:#aaa;margin-bottom:6px;font-weight:500}
+  input{width:100%;padding:12px 16px;background:#12122a;border:1px solid #333;border-radius:8px;color:#fff;font-size:14px;outline:none;transition:border .2s}
+  input:focus{border-color:#6c63ff}
+  input::placeholder{color:#555}
+  .btn{width:100%;padding:14px;background:linear-gradient(135deg,#6c63ff,#4834d4);border:none;border-radius:8px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
+  .btn:hover{opacity:.9}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .result{margin-top:24px;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;display:none}
+  .result.ok{background:#0a2a1a;border:1px solid #1a4a2a;color:#4ade80}
+  .result.err{background:#2a0a0a;border:1px solid #4a1a1a;color:#f87171}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .badge{padding:4px 10px;border-radius:12px;font-size:12px;font-weight:500}
+  .badge.on{background:#1a3a2a;color:#4ade80}
+  .badge.off{background:#1a1a2a;color:#555}
+  .help{text-align:center;margin-top:24px;font-size:12px;color:#555}
+  a{color:#6c63ff;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🐕 Chatub</h1>
+  <p class="sub">OpenClaw 에이전트를 관제탑에 등록합니다</p>
+
+  <div class="field">
+    <label>에이전트 이름</label>
+    <input id="name" placeholder="예: 라이카, 샤오미" autocomplete="off">
+  </div>
+  <div class="field">
+    <label>Gateway URL</label>
+    <input id="url" placeholder="http://192.168.0.101:18789" autocomplete="off">
+  </div>
+  <div class="field">
+    <label>API Key (Gateway Token)</label>
+    <input id="token" type="password" placeholder="Bearer 토큰" autocomplete="off">
+  </div>
+
+  <button class="btn" id="btn" onclick="register()">감지 & 등록</button>
+
+  <div class="result" id="result"></div>
+
+  <p class="help">
+    토큰은 AES 암호화되어 저장됩니다. 자세한 내용은
+    <a href="/openclaw-gateway-api" target="_blank">API 가이드</a> 참고
+  </p>
+</div>
+
+<script>
+const API = window.location.origin + '/api/gateways/auto-detect';
+const ICONS = {chat:'💬',streaming:'📡',tools:'🔧',sessions:'💻',models:'🧠'};
+const LABELS = {chat:'Chat',streaming:'Stream',tools:'Tools',sessions:'Sessions',models:'Models'};
+
+async function register() {
+  const name = document.getElementById('name').value.trim();
+  const url  = document.getElementById('url').value.trim();
+  const token = document.getElementById('token').value.trim();
+  const btn  = document.getElementById('btn');
+  const res  = document.getElementById('result');
+
+  if (!name || !url) return alert('이름과 URL을 입력해주세요');
+
+  btn.disabled = true;
+  btn.textContent = '감지 중...';
+  res.style.display = 'none';
+
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, url, token})
+    });
+    const d = await r.json();
+
+    if (!d.ok) {
+      res.className = 'result err';
+      res.innerHTML = '❌ ' + (d.error || '감지 실패');
+    } else {
+      const det = d.data.detected;
+      const reg = d.data.registered;
+      let html = (reg ? '✅ 등록 완료!' : '✅ 감지 성공!') + '<br><br>';
+      html += `<b>${name}</b> — ${det.reachable ? '🟢 연결됨' : '🔴 연결 실패'}`;
+      if (det.version) html += `<br>버전: ${det.version}`;
+      if (det.agents && det.agents.length) html += `<br>에이전트: ${det.agents.join(', ')}`;
+
+      if (det.capabilities) {
+        html += '<div class="badges">';
+        for (const [k, v] of Object.entries(det.capabilities)) {
+          html += `<span class="badge ${v ? 'on' : 'off'}">${ICONS[k]||''} ${LABELS[k]||k} ${v ? '✓' : '—'}</span>`;
+        }
+        html += '</div>';
+      }
+
+      if (reg) {
+        html += `<br>관제탑에서 확인하세요 → <a href="/" target="_blank">대시보드 열기</a>`;
+      }
+
+      res.className = 'result ok';
+      res.innerHTML = html;
+    }
+  } catch (e) {
+    res.className = 'result err';
+    res.innerHTML = '❌ 서버 오류: ' + e.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '감지 & 등록';
+}
+
+document.getElementById('token').addEventListener('keydown', e => {
+  if (e.key === 'Enter') register();
+});
+</script>
+</body>
+</html>

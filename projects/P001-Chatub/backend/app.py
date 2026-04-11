@@ -377,6 +377,11 @@ async def serve_index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/register")
+async def serve_register():
+    return FileResponse(STATIC_DIR / "register.html")
+
+
 # -- Startup: init DB --
 
 @app.on_event("startup")
