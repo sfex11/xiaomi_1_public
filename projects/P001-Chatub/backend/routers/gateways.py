@@ -75,7 +75,13 @@ def _health_check(gw):
     if data is not None:
         result["online"] = True
         if isinstance(data, dict):
-            result["version"] = data.get("object", "ok")
+            # Extract model list for agents
+            models = data.get("data", [])
+            if isinstance(models, list):
+                result["agents"] = [m.get("id", "") for m in models]
+                result["version"] = f"{len(models)} models" if models else "ok"
+            else:
+                result["version"] = "ok"
 
     result["state"] = _classify_agent_state(gw_url, gw_token, result["online"])
     return result
