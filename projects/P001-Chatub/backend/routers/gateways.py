@@ -111,6 +111,7 @@ async def auto_detect(request: Request):
 
     url = data.get("url", "").strip()
     token = data.get("token", "").strip()
+    name = data.get("name", "").strip()
 
     if not url:
         return {"ok": False, "error": "url is required"}
@@ -120,6 +121,23 @@ async def auto_detect(request: Request):
         adapter = create_adapter(kind)
         probe = await adapter.probe(url, token)
         encrypted_token = encrypt(token)
+
+        # If name provided, auto-register after successful detection
+        if name and probe.reachable:
+            db = get_db()
+            try:
+                gid = new_id()
+                cap_json = json.dumps(probe.capabilities or {})
+                db.execute(
+                    "INSERT INTO gateways (id,name,url,token,kind,capabilities,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (gid, name, url, encrypted_token, kind, cap_json, now_ts(), now_ts()),
+                )
+                db.commit()
+                db.close()
+                return json_ok({"detected": probe, "registered": True, "id": gid, "name": name})
+            finally:
+                db.close()
+
         return json_ok({"detected": probe, "encrypted_token": encrypted_token})
         if probe.reachable:
             return {
