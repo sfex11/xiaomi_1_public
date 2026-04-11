@@ -25,7 +25,15 @@ from routers import ws as ws_router
 from routers import agent as agent_router
 from routers import gateways as gateways_router
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+_limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="Chatub Backend")
+app.state.limiter = _limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS
 app.add_middleware(
@@ -65,6 +73,7 @@ def json_err(error, status=400):
 # where direct browser→API calls are blocked.
 
 @app.post("/api/chat")
+@_limiter.limit("60/minute")
 async def handle_chat(request: Request):
     body = await request.body()
     data = json.loads(body)
@@ -167,6 +176,7 @@ def _log_chat(gw_id, gw_name, messages, assistant_content, model, usage):
 
 
 @app.post("/api/gateway-chat")
+@_limiter.limit("60/minute")
 async def handle_gateway_chat(request: Request):
     """Proxy chat to any registered Gateway via Adapter.
     Supports multi-gateway: specify gateway_id to route to a specific gateway.
@@ -232,6 +242,7 @@ async def handle_gateway_chat(request: Request):
 # -- Broadcast chat to all online gateways (via Adapter) --
 
 @app.post("/api/gateway-broadcast")
+@_limiter.limit("30/minute")
 async def handle_broadcast(request: Request):
     """Send message to all online gateways via Adapter, return all responses."""
     body = await request.body()
