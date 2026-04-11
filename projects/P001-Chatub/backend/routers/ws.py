@@ -32,6 +32,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from starlette.websockets import WebSocketState
 
 from auth import verify_token
+from crypto import decrypt
 from db import get_db, new_id, now_ts, owns_project, project_for_channel
 
 router = APIRouter()
@@ -443,7 +444,7 @@ async def ws_chat(ws: WebSocket):
                 kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
                 try:
                     result = await _stream_one_gateway(
-                        ws, gid, gname, gw["url"], gw["token"] or "",
+                        ws, gid, gname, gw["url"], decrypt(gw["token"] or ""),
                         kind or "openclaw", payload)
                     _save_chat_log(gid, gname, messages,
                                    result[2], result[3], result[4])

@@ -9,6 +9,7 @@ import logging
 
 from fastapi import APIRouter, Request
 from db import get_db, new_id, now_ts, row_to_dict, rows_to_list
+from crypto import encrypt, decrypt
 from adapters import create_adapter, available_adapters, ProbeResult
 
 router = APIRouter(prefix="/api/gateways", tags=["gateways"])
@@ -27,7 +28,7 @@ def _adapter_for(gw):
 async def _health_check_async(gw):
     """Async health check via adapter. Returns legacy-compatible dict."""
     adapter = _adapter_for(gw)
-    hs = await adapter.health(gw["url"], gw["token"] or "")
+    hs = await adapter.health(gw["url"], decrypt(gw["token"] or ""))
     return {
         "online": hs.online,
         "version": hs.version,
@@ -77,7 +78,7 @@ async def register_gateway(request: Request):
             gid = existing["id"]
             db.execute(
                 "UPDATE gateways SET url=?, token=?, kind=?, updated_at=? WHERE id=?",
-                (url, token, kind, now_ts(), gid)
+                (url, encrypt(token), kind, now_ts(), gid)
             )
             log.info("Updated gateway: %s (%s) kind=%s", name, url, kind)
         else:
@@ -85,7 +86,7 @@ async def register_gateway(request: Request):
             db.execute(
                 "INSERT INTO gateways (id, name, url, token, kind, capabilities, created_at, updated_at) "
                 "VALUES (?,?,?,?,?,?,?,?)",
-                (gid, name, url, token, kind, "{}", now_ts(), now_ts())
+                (gid, name, url, encrypt(token), kind, "{}", now_ts(), now_ts())
             )
             log.info("Registered gateway: %s (%s) kind=%s", name, url, kind)
 
@@ -118,6 +119,8 @@ async def auto_detect(request: Request):
     for kind in available_adapters():
         adapter = create_adapter(kind)
         probe = await adapter.probe(url, token)
+        encrypted_token = encrypt(token)
+        return json_ok({"detected": probe, "encrypted_token": encrypted_token})
         if probe.reachable:
             return {
                 "ok": True,
@@ -335,7 +338,7 @@ async def get_gateway_agents(gateway_id: str):
             return {"ok": False, "error": "Gateway not found"}
 
         adapter = _adapter_for(gw)
-        models = await adapter.list_models(gw["url"], gw["token"] or "")
+        models = await adapter.list_models(gw["url"], decrypt(gw["token"] or ""))
         return {"ok": True, "data": {"data": models}}
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -353,7 +356,7 @@ async def get_gateway_sessions(gateway_id: str):
             return {"ok": False, "error": "Gateway not found"}
 
         adapter = _adapter_for(gw)
-        sessions = await adapter.list_sessions(gw["url"], gw["token"] or "")
+        sessions = await adapter.list_sessions(gw["url"], decrypt(gw["token"] or ""))
         if not sessions:
             return {"ok": True, "data": {"note": "sessions endpoint not available", "status": "online"}}
         return {"ok": True, "data": sessions}
@@ -377,8 +380,9 @@ async def get_gateway_history(gateway_id: str, limit: int = 20):
         try:
             async with httpx.AsyncClient(timeout=10) as c:
                 headers = {"Content-Type": "application/json"}
-                if gw["token"]:
-                    headers["Authorization"] = f"Bearer {gw['token']}"
+                raw_token = decrypt(gw["token"] or "")
+                if raw_token:
+                    headers["Authorization"] = f"Bearer {raw_token}"
                 r = await c.get(f"{gw['url'].rstrip('/')}/api/history?limit={limit}", headers=headers)
                 if r.status_code < 400:
                     return {"ok": True, "data": r.json()}
