@@ -390,6 +390,11 @@ async def serve_register():
 async def serve_register2():
     return FileResponse(STATIC_DIR / "register2.html")
 
+
+@app.get("/register3")
+async def serve_register3():
+    return FileResponse(STATIC_DIR / "register3.html")
+
 # -- Static files (frontend) --
 
 SRC_DIR = Path(__file__).parent.parent / "src"

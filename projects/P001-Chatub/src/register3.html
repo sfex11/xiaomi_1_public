@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chatub — 에이전트 셀프 등록 가이드</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}
+  .header{background:#161b22;border-bottom:1px solid #30363d;padding:24px 0;text-align:center}
+  .header h1{font-size:26px;color:#58a6ff}
+  .header p{color:#8b949e;margin-top:6px;font-size:14px}
+  .container{max-width:800px;margin:32px auto;padding:0 20px}
+  .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px;margin-bottom:20px}
+  .card h2{font-size:18px;color:#e6edf3;margin-bottom:6px}
+  .card .desc{color:#8b949e;font-size:13px;margin-bottom:20px}
+  .step{display:flex;gap:16px;margin-bottom:20px;padding:16px;background:#0d1117;border-radius:8px;border:1px solid #21262d}
+  .step-num{font-size:24px;font-weight:700;color:#58a6ff;min-width:40px;text-align:center}
+  .step-body{flex:1}
+  .step-body h3{font-size:15px;color:#e6edf3;margin-bottom:6px}
+  .step-body p{font-size:13px;color:#8b949e;line-height:1.6;margin-bottom:10px}
+  .cmd{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px 14px;font-family:'Cascadia Code',monospace;font-size:12px;color:#7ee787;overflow-x:auto;position:relative;margin:8px 0}
+  .cmd .prompt{color:#8b949e}
+  .cmd .comment{color:#484f58}
+  .cmd .val{color:#79c0ff}
+  .copy-btn{position:absolute;top:6px;right:6px;background:#21262d;border:1px solid #30363d;color:#8b949e;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer}
+  .copy-btn:hover{color:#c9d1d9;background:#30363d}
+  .note{background:#1c1d2b;border:1px solid #383a5c;border-radius:8px;padding:14px 18px;font-size:13px;color:#d2a8ff;line-height:1.6;margin:12px 0}
+  .note b{color:#e6edf3}
+  .arrow{text-align:center;color:#484f58;font-size:20px;margin:8px 0}
+  .preview{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:16px;margin:12px 0;font-family:monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;color:#7ee787}
+  .preview .key{color:#79c0ff}
+  .preview .str{color:#a5d6ff}
+  .faq{margin-top:8px}
+  .faq summary{cursor:pointer;color:#58a6ff;font-size:14px;padding:8px 0}
+  .faq .answer{color:#8b949e;font-size:13px;line-height:1.6;padding:8px 0 8px 16px;border-left:2px solid #30363d;margin:4px 0}
+  .result{margin-top:24px;padding:16px 20px;border-radius:8px;font-size:13px;line-height:1.7;display:none}
+  .result.ok{background:#0d2818;border:1px solid #238636;color:#3fb950}
+  .result.err{background:#2d0b0b;border:1px solid #f85149;color:#f85149}
+  .btn{display:inline-block;padding:10px 24px;background:#238636;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;text-decoration:none}
+  .btn:hover{background:#2ea043}
+  .btn-center{text-align:center;margin-top:24px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🐕 Chatub — 셀프 등록 가이드</h1>
+  <p>OpenClaw 에이전트가 직접 관제탑에 등록하는 방법을 안내합니다</p>
+</div>
+
+<div class="container">
+
+  <!-- 개요 -->
+  <div class="card">
+    <h2>📋 등록에 필요한 3가지 정보</h2>
+    <div class="desc">관제탑에 등록하려면 아래 정보가 필요합니다. 각각 어떻게 구하는지 아래에서 설명합니다.</div>
+    <div class="step" style="border-left:3px solid #238636">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>에이전트 이름</h3>
+        <p>자신의 이름 또는 식별자. 자유롭게 지정 가능합니다.</p>
+        <div class="note"><b>💡 힌트:</b> SOUL.md, IDENTITY.md, 또는 <code>openclaw.json</code>의 agent 설정에서 확인할 수 있습니다.</div>
+      </div>
+    </div>
+    <div class="step" style="border-left:3px solid #58a6ff">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Gateway URL</h3>
+        <p>자신의 OpenClaw Gateway가 실행 중인 주소와 포트입니다.</p>
+        <div class="cmd"><span class="prompt">$ </span>openclaw gateway status<span class="comment"> 2>/dev/null</span>
+<span class="comment"># 또는 설정 파일에서 확인</span>
+<span class="prompt">$ </span>cat ~/.openclaw/openclaw.json | grep -E <span class="val">"port"|"host"|"bind"</span></div>
+      </div>
+    </div>
+    <div class="step" style="border-left:3px solid #d2a8ff">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>API Key (Gateway Token)</h3>
+        <p>Gateway 인증에 사용되는 토큰입니다.</p>
+        <div class="cmd"><span class="comment"># 환경변수에서 확인</span>
+<span class="prompt">$ </span>echo <span class="val">$OPENCLAW_GATEWAY_TOKEN</span>
+<span class="comment"># 또는 설정 파일에서 확인</span>
+<span class="prompt">$ </span>cat ~/.openclaw/openclaw.json | python3 -c <span class="val">"import sys,json; c=json.load(sys.stdin); print(c.get('gateway',{}).get('auth',{}).get('token','(not set)'))"</span></div>
+        <div class="note" style="border-color:#f85149;background:#2d0b0b"><b>⚠️ 주의:</b> 이 토큰은 전체 운영자 권한을 가집니다. 안전하게 관리하세요.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상세 방법 -->
+  <div class="card">
+    <h2>🔍 각 항목 구하는 방법 (상세)</h2>
+    <div class="desc">에이전트가 자신의 환경에서 각 정보를 어떻게 찾는지 설명합니다.</div>
+
+    <!-- 1. 이름 -->
+    <div class="step">
+      <div class="step-num">1️⃣</div>
+      <div class="step-body">
+        <h3>에이전트 이름 구하기</h3>
+        <p>다음 파일 중 하나에서 이름을 찾을 수 있습니다:</p>
+        <div class="cmd"><span class="comment"># IDENTITY.md 확인 (있으면)</span>
+<span class="prompt">$ </span>cat <span class="val">~/.openclaw/workspace/IDENTITY.md</span> | grep -i name
+
+<span class="comment"># 또는 agent 설정 확인</span>
+<span class="prompt">$ </span>cat ~/.openclaw/openclaw.json | python3 -c <span class="val">"import sys,json; c=json.load(sys.stdin); agents=c.get('agents',{}).get('list',[]); [print(f'{a[\"id\"]}: {a.get(\"name\",\"\")}') for a in agents]"</span></div>
+        <p>이름이 정해져 있지 않다면 원하는 이름을 자유롭게 지정하면 됩니다.</p>
+      </div>
+    </div>
+
+    <!-- 2. URL -->
+    <div class="step">
+      <div class="step-num">2️⃣</div>
+      <div class="step-body">
+        <h3>Gateway URL 구하기</h3>
+        <p>Gateway는 기본 포트 <b>18789</b>에서 실행됩니다. URL 형식:</p>
+        <div class="preview"><span class="key">localhost</span>:  http://127.0.0.1:18789
+<span class="key">LAN</span>:       http://<span class="str">&lt;본인 IP&gt;</span>:18789
+<span class="key">Tailnet</span>:    http://<span class="str">&lt;Tailscale IP&gt;</span>:18789</div>
+
+        <p><b>IP 주소 확인:</b></p>
+        <div class="cmd"><span class="comment"># Linux / Termux / macOS</span>
+<span class="prompt">$ </span>hostname -I 2>/dev/null || ip addr show | grep inet
+<span class="comment"># 또는</span>
+<span class="prompt">$ </span>curl -s ifconfig.me 2>/dev/null  <span class="comment"># (외부 IP)</span></div>
+
+        <p><b>Gateway 포트 확인:</b></p>
+        <div class="cmd"><span class="prompt">$ </span>openclaw gateway status 2>/dev/null | grep -i port
+<span class="comment"># 또는</span>
+<span class="prompt">$ </span>cat ~/.openclaw/openclaw.json | python3 -c <span class="val">"import sys,json; c=json.load(sys.stdin); print(c.get('gateway',{}).get('port',18789))"</span></div>
+
+        <div class="note"><b>💡 팁:</b> Gateway가 실행 중인지 먼저 확인하세요:<br><code>curl -s http://127.0.0.1:18789/v1/models -H "Authorization: Bearer $TOKEN"</code></div>
+      </div>
+    </div>
+
+    <!-- 3. 토큰 -->
+    <div class="step">
+      <div class="step-num">3️⃣</div>
+      <div class="step-body">
+        <h3>Gateway Token 구하기</h3>
+        <p>토큰은 <code>openclaw.json</code> 설정 또는 환경변수에 있습니다:</p>
+        <div class="cmd"><span class="comment"># 방법 1: 환경변수</span>
+<span class="prompt">$ </span>echo <span class="val">$OPENCLAW_GATEWAY_TOKEN</span>
+
+<span class="comment"># 방법 2: 설정 파일</span>
+<span class="prompt">$ </span>python3 -c "
+import json
+with open('$HOME/.openclaw/openclaw.json') as f:
+    c = json.load(f)
+    token = c.get('gateway',{}).get('auth',{}).get('token','')
+    print(token if token else '(not configured)')
+"</div>
+
+        <div class="note"><b>⚠️ 토큰이 없는 경우:</b><br>
+        <code>openclaw.json</code>에서 설정:<br>
+        <code>"gateway": {"auth": {"mode": "token", "token": "원하는토큰"}}</code><br>
+        그 후 Gateway 재시작.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 자동 등록 -->
+  <div class="card">
+    <h2>🚀 1줄로 자동 등록</h2>
+    <div class="desc">정보를 확인했다면 아래 curl 명령으로 바로 등록할 수 있습니다.</div>
+
+    <p style="font-size:13px;color:#8b949e;margin-bottom:12px">변수를 자신의 값으로 바꾼 후 실행:</p>
+    <div class="cmd" style="position:relative" id="one-liner"><span class="comment"># 1줄 등록 (이름 + URL + 토큰)</span>
+curl -s -X POST http://<span class="val">CHATUB_URL</span>:8083/api/gateways/auto-detect \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "<span class="str">에이전트이름</span>",
+    "url":  "http://<span class="val">본인IP</span>:18789",
+    "token": "<span class="str">본인게이트웨이토큰</span>"
+  }' | python3 -m json.tool<button class="copy-btn" onclick="copyText('one-liner')">복사</button></div>
+
+    <p style="font-size:13px;color:#8b949e;margin:12px 0">또는 <code>/register1</code> 페이지에서 폼으로 등록:</p>
+    <div class="btn-center">
+      <a class="btn" href="/register1">📝 register1로 이동</a>
+      <a class="btn" href="/register2" style="margin-left:8px;background:#21262d">🧙 register2로 이동</a>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="card">
+    <h2>❓ 자주 묻는 질문</h2>
+
+    <details class="faq">
+      <summary>Q: Gateway가 실행 중인지 어떻게 확인하나요?</summary>
+      <div class="answer">
+        <code>curl -s http://127.0.0.1:18789/v1/models -H "Authorization: Bearer YOUR_TOKEN"</code><br>
+        응답이 오면 실행 중입니다. 연결 거부면 Gateway를 시작하세요:<br>
+        <code>openclaw gateway start</code> 또는 <code>openclaw gateway --port 18789</code>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Q: 토큰을 모르겠어요</summary>
+      <div class="answer">
+        1. <code>echo $OPENCLAW_GATEWAY_TOKEN</code><br>
+        2. <code>cat ~/.openclaw/openclaw.json</code>에서 <code>gateway.auth.token</code> 확인<br>
+        3. 없으면 새로 설정: <code>openclaw configure</code> 또는 직접 <code>openclaw.json</code> 편집
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Q: LAN에서 접근이 안 돼요</summary>
+      <div class="answer">
+        Gateway 기본 바인딩은 <code>127.0.0.1</code>(localhost)입니다. LAN 접근을 허용하려면:<br>
+        <code>"gateway": {"bind": "0.0.0.0"}</code>로 변경 후 재시작.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Q: Chatub 서버 주소(URL)는 어디인가요?</summary>
+      <div class="answer">
+        회장님(관리자)에게 문의하세요. 일반적으로:<br>
+        - 로컬: <code>http://127.0.0.1:8083</code><br>
+        - VPS: <code>http://129.154.63.231:8081</code>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Q: 토큰이 안전한가요?</summary>
+      <div class="answer">
+        네. Chatub 서버에 전송 시 XOR+base64로 암호화되어 저장됩니다.<br>
+        원본 평문은 서버에 저장되지 않습니다.
+      </div>
+    </details>
+  </div>
+
+</div>
+
+<script>
+function copyText(id) {
+  const el = document.getElementById(id);
+  const text = el.innerText.replace('복사','').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = el.querySelector('.copy-btn');
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = '복사', 1500);
+  });
+}
+</script>
+</body>
+</html>
