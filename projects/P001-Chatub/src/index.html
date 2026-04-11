@@ -1295,7 +1295,39 @@ a { color: var(--accent); text-decoration: none; }
         <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
           <!-- Agent Status Cards -->
           <div style="padding:16px;border-bottom:1px solid var(--border);overflow-x:auto;">
-            <div style="display:flex;gap:12px;min-width:max-content;" id="agent-status-cards"></div>
+            <div style="display:flex;gap:12px;min-width:max-content;align-items:center;" id="agent-status-cards"></div>
+            <button onclick="openWizardModal()" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ 에이전트 추가</button>
+          </div>
+          <!-- Connection Wizard Modal -->
+          <div id="wizard-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+            <div id="wizard-modal" style="background:var(--bg-primary);border-radius:16px;width:420px;max-width:90vw;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h3 style="margin:0;font-size:18px;font-weight:700;">🪄 에이전트 연결 마법사</h3>
+                <button onclick="closeWizardModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;">✕</button>
+              </div>
+              <!-- Step 1: Input -->
+              <div id="wizard-step1">
+                <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">에이전트 이름</label>
+                <input id="wizard-name" type="text" placeholder="예: renover, hermes, claude" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:12px;box-sizing:border-box;">
+                <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Base URL</label>
+                <input id="wizard-url" type="text" placeholder="예: http://192.168.0.110:18789" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:12px;box-sizing:border-box;">
+                <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">API Token (선택)</label>
+                <input id="wizard-token" type="password" placeholder="Gateway 토큰" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:16px;box-sizing:border-box;">
+                <button onclick="wizardAutoDetect()" id="wizard-detect-btn" style="width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🔍 자동 감지</button>
+              </div>
+              <!-- Step 2: Results -->
+              <div id="wizard-step2" style="display:none;">
+                <div id="wizard-spinner" style="text-align:center;padding:40px 0;">
+                  <div style="font-size:32px;margin-bottom:12px;">🔍</div>
+                  <div style="color:var(--text-secondary);">연결 감지 중...</div>
+                </div>
+                <div id="wizard-results" style="display:none;"></div>
+                <div id="wizard-actions" style="display:none;margin-top:16px;display:flex;gap:8px;">
+                  <button onclick="wizardBack()" style="flex:1;padding:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;">← 다시</button>
+                  <button onclick="wizardSave()" id="wizard-save-btn" style="flex:2;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">✅ 등록</button>
+                </div>
+              </div>
+            </div>
           </div>
           <!-- Activity + Tool Log Tabs -->
           <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
@@ -4651,6 +4683,141 @@ async function renderChatLogsTab(c) {
       <div style="font-size:13px;color:var(--text-primary);padding-left:22px;">${escapeHtml(l.content)}</div>
     </div>`;
   }).join('');
+}
+
+// ─── Connection Wizard ───────────────────────────────────────
+let wizardDetectResult = null;
+
+function openWizardModal() {
+  const overlay = $('wizard-overlay');
+  overlay.style.display = 'flex';
+  $('wizard-step1').style.display = 'block';
+  $('wizard-step2').style.display = 'none';
+  $('wizard-name').value = '';
+  $('wizard-url').value = '';
+  $('wizard-token').value = '';
+  wizardDetectResult = null;
+}
+
+function closeWizardModal() {
+  $('wizard-overlay').style.display = 'none';
+}
+
+function wizardBack() {
+  $('wizard-step1').style.display = 'block';
+  $('wizard-step2').style.display = 'none';
+  wizardDetectResult = null;
+}
+
+async function wizardAutoDetect() {
+  const name = $('wizard-name').value.trim();
+  const url = $('wizard-url').value.trim();
+  const token = $('wizard-token').value.trim();
+  
+  if (!name || !url) {
+    alert('이름과 URL을 입력해주세요.');
+    return;
+  }
+  
+  $('wizard-step1').style.display = 'none';
+  $('wizard-step2').style.display = 'block';
+  $('wizard-spinner').style.display = 'block';
+  $('wizard-results').style.display = 'none';
+  $('wizard-actions').style.display = 'none';
+  
+  try {
+    const resp = await fetch('/api/gateways/auto-detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, url, token })
+    });
+    const data = await resp.json();
+    
+    $('wizard-spinner').style.display = 'none';
+    
+    if (data.ok) {
+      const r = data.data;
+      wizardDetectResult = { name, url, token, capabilities: r.capabilities || {} };
+      
+      const caps = r.capabilities || {};
+      const capHTML = Object.entries(caps).map(([k, v]) => {
+        const label = {chat:'Chat',streaming:'Stream',tools:'Tools',sessions:'Sessions',models:'Models'}[k] || k;
+        return v ? '<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;background:var(--success);color:#fff;">🟢 ' + label + '</span>' : '<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;background:var(--bg-secondary);color:var(--text-muted);border:1px solid var(--border);">⚪ ' + label + '</span>';
+      }).join(' ');
+      
+      const kind = r.kind || 'unknown';
+      const kindEmoji = {openclaw:'☁️',hermes:'🐦','openai-compatible':'🤖',auto:'🔍'}[kind] || '🖥️';
+      
+      $('wizard-results').innerHTML = '<div style="text-align:center;margin-bottom:16px;">' +
+        '<div style="font-size:40px;margin-bottom:8px;">✅</div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--success);">연결 성공!</div>' +
+        '</div>' +
+        '<div style="background:var(--bg-secondary);border-radius:10px;padding:14px;margin-bottom:12px;">' +
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">런타임</div>' +
+        '<div style="font-size:15px;font-weight:600;">' + kindEmoji + ' ' + escapeHtml(kind) + '</div>' +
+        '</div>' +
+        '<div style="background:var(--bg-secondary);border-radius:10px;padding:14px;margin-bottom:12px;">' +
+        '<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">감지된 기능</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + capHTML + '</div>' +
+        '</div>' +
+        (r.models ? '<div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">모델 ' + r.models.length + '개 발견</div>' : '') +
+        (r.version ? '<div style="font-size:12px;color:var(--text-muted);">버전: ' + escapeHtml(r.version) + '</div>' : '');
+      
+      $('wizard-save-btn').disabled = false;
+      $('wizard-save-btn').textContent = '✅ 등록';
+    } else {
+      const errCode = data.error_code || 'unknown';
+      const errMsg = data.error || '알 수 없는 오류';
+      const errEmoji = {auth_failed:'🔒',cors_blocked:'🌐',timeout:'⏱️',unsupported_api:'❌',network_error:'📶'}[errCode] || '⚠️';
+      const errDesc = {auth_failed:'인증 실패 — API Key를 확인하세요',cors_blocked:'CORS 차단 — 서버 설정을 확인하세요',timeout:'응답 시간 초과 — URL과 네트워크를 확인하세요',unsupported_api:'미지원 API — OpenClaw/Hermes 호환 엔드포인트가 아닙니다',network_error:'네트워크 오류 — 서버에 도달할 수 없습니다'}[errCode] || errMsg;
+      
+      $('wizard-results').innerHTML = '<div style="text-align:center;margin-bottom:16px;">' +
+        '<div style="font-size:40px;margin-bottom:8px;">' + errEmoji + '</div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--danger);">연결 실패</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,59,48,0.1);border-radius:10px;padding:14px;">' +
+        '<div style="font-size:14px;font-weight:600;color:var(--danger);margin-bottom:4px;">' + escapeHtml(errDesc) + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);">코드: ' + escapeHtml(errCode) + '</div>' +
+        '</div>';
+      
+      wizardDetectResult = null;
+    }
+    
+    $('wizard-results').style.display = 'block';
+    $('wizard-actions').style.display = 'flex';
+    
+  } catch (e) {
+    $('wizard-spinner').style.display = 'none';
+    $('wizard-results').innerHTML = '<div style="text-align:center;">' +
+      '<div style="font-size:40px;margin-bottom:8px;">⚠️</div>' +
+      '<div style="font-size:14px;color:var(--danger);">서버 오류가 발생했습니다</div>' +
+      '</div>';
+    $('wizard-results').style.display = 'block';
+    $('wizard-actions').style.display = 'flex';
+  }
+}
+
+async function wizardSave() {
+  if (!wizardDetectResult) return;
+  
+  try {
+    const resp = await fetch('/api/gateways/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(wizardDetectResult)
+    });
+    const data = await resp.json();
+    
+    if (data.ok) {
+      closeWizardModal();
+      // Refresh control tower
+      if (typeof renderControlTower === 'function') renderControlTower();
+    } else {
+      alert('등록 실패: ' + (data.error || ''));
+    }
+  } catch (e) {
+    alert('서버 오류: ' + e.message);
+  }
 }
 </script>
 </body>

@@ -193,6 +193,94 @@ async def list_gateways():
         db.close()
 
 
+
+@router.post("/auto-detect")
+async def auto_detect_gateway(request: Request):
+    """Probe a gateway URL and detect runtime type + capabilities."""
+    import asyncio
+    body = await request.body()
+    data = json.loads(body)
+
+    name = data.get("name", "").strip()
+    url = data.get("url", "").strip()
+    token = data.get("token", "").strip()
+    port = data.get("port", 18789)
+
+    if not url:
+        return {"ok": False, "error": "url is required", "error_code": "network_error"}
+
+    # Build full URL
+    if port and ":" not in url.split("//")[-1]:
+        url = f"{url.rstrip('/')}:{port}"
+
+    gw = {"url": url, "token": token, "name": name}
+
+    capabilities = {"chat": False, "streaming": False, "tools": False, "sessions": False, "models": False}
+    kind = "unknown"
+    version = None
+    models = []
+
+    # 1. Try /v1/models (OpenAI-compatible)
+    models_data = _query_gateway(gw, gw["token"], "/v1/models")
+    if models_data is not None:
+        capabilities["models"] = True
+        capabilities["chat"] = True
+        if isinstance(models_data, dict):
+            models = models_data.get("data", [])
+            if isinstance(models, list):
+                capabilities["chat"] = True
+                capabilities["streaming"] = True
+                version = f"{len(models)} models"
+
+    # 2. Try /api/sessions (OpenClaw-specific)
+    sessions_data = _query_gateway(gw, gw["token"], "/api/sessions")
+    if sessions_data is not None:
+        capabilities["sessions"] = True
+        capabilities["tools"] = True
+        kind = "openclaw"
+    elif models_data is not None:
+        kind = "openai-compatible"
+
+    # 3. Try streaming test
+    if capabilities["chat"]:
+        stream_url = f"{url.rstrip('/')}/v1/chat/completions"
+        try:
+            import urllib.request as ur
+            headers = {"Content-Type": "application/json"}
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            payload = json.dumps({
+                "model": models[0]["id"] if models else "default",
+                "messages": [{"role": "user", "content": "ping"}],
+                "max_tokens": 5,
+                "stream": True
+            }).encode()
+            req = ur.Request(stream_url, data=payload, headers=headers, method="POST")
+            resp = ur.urlopen(req, timeout=5)
+            first_chunk = resp.read(200).decode()
+            if "data:" in first_chunk:
+                capabilities["streaming"] = True
+        except Exception:
+            pass
+
+    # Determine final kind
+    if kind == "unknown":
+        if capabilities["chat"]:
+            kind = "openai-compatible"
+        else:
+            return {"ok": False, "error": "지원되지 않는 엔드포인트", "error_code": "unsupported_api"}
+
+    return {
+        "ok": True,
+        "data": {
+            "kind": kind,
+            "capabilities": capabilities,
+            "version": version,
+            "models": [{"id": m.get("id", ""), "name": m.get("id", "")} for m in models[:5]] if models else None
+        }
+    }
+
+
 @router.delete("/{gateway_id}")
 async def delete_gateway(gateway_id: str):
     """Remove a registered gateway."""
