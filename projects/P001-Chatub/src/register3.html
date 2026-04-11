@@ -54,7 +54,8 @@
   <!-- 개요 -->
   <div class="card">
     <h2>📋 등록에 필요한 3가지 정보</h2>
-    <div class="desc">관제탑에 등록하려면 아래 정보가 필요합니다. 각각 어떻게 구하는지 아래에서 설명합니다.</div>
+    <div class="desc">관제탑에 등록하려면 아래 정보가 필요합니다. <b style="color:#f85149">⚠️ 관제탑은 내부망(192.168.0.x) 전용입니다.</b> 외부망(공인 IP)으로는 접근할 수 없습니다.</div>
+    <div class="note" style="border-color:#f85149;background:#2d0b0b;margin-bottom:20px"><b>🔒 네트워크 요구사항:</b><br>• 관제탑(Chatub)과 에이전트가 <b>같은 내부망</b>에 있어야 합니다<br>• IP가 <b>192.168.0.x</b> 대역이어야 합니다<br>• <code>curl ifconfig.me</code>(공인 IP)로는 접근 <b>불가</b>합니다<br>• WiFi가 같은 라우터에 연결되어 있는지 확인하세요</div>
     <div class="step" style="border-left:3px solid #238636">
       <div class="step-num">1</div>
       <div class="step-body">
@@ -114,14 +115,23 @@
         <h3>Gateway URL 구하기</h3>
         <p>Gateway는 기본 포트 <b>18789</b>에서 실행됩니다. URL 형식:</p>
         <div class="preview"><span class="key">localhost</span>:  http://127.0.0.1:18789
-<span class="key">LAN</span>:       http://<span class="str">&lt;본인 IP&gt;</span>:18789
-<span class="key">Tailnet</span>:    http://<span class="str">&lt;Tailscale IP&gt;</span>:18789</div>
+<span class="key">내부망(LAN)</span>: http://<span class="str">192.168.0.x</span>:18789  ← <span style="color:#f85149">이것을 사용하세요</span></div>
 
-        <p><b>IP 주소 확인:</b></p>
+        <p style="color:#f85149;font-weight:600">⚠️ 다음은 사용하지 마세요:</p>
+        <div class="cmd"><span class="comment"># ❌ 공인 IP로는 접근할 수 없습니다!</span>
+<span class="prompt">$ </span>curl -s ifconfig.me
+<span class="comment"># → 이 결과(예: 1.2.3.4)로는 관제탑에서 접근 불가</span>
+
+<span class="comment"># ❌ Tailscale IP도 현재 미지원</span>
+<span class="prompt">$ </span>curl -s ifconfig.ts.net</div>
+
+        <p><b>✅ 올바른 내부망 IP 확인 방법:</b></p>
         <div class="cmd"><span class="comment"># Linux / Termux / macOS</span>
-<span class="prompt">$ </span>hostname -I 2>/dev/null || ip addr show | grep inet
-<span class="comment"># 또는</span>
-<span class="prompt">$ </span>curl -s ifconfig.me 2>/dev/null  <span class="comment"># (외부 IP)</span></div>
+<span class="prompt">$ </span>hostname -I 2>/dev/null || ip addr show | grep <span class="val">"192.168.0"</span>
+<span class="comment"># → 192.168.0.xxx 형태의 IP를 찾으세요</span>
+
+<span class="comment"># 또는 간단히</span>
+<span class="prompt">$ </span>ip addr show wlan0 2>/dev/null | grep <span class="val">inet</span></div>
 
         <p><b>Gateway 포트 확인:</b></p>
         <div class="cmd"><span class="prompt">$ </span>openclaw gateway status 2>/dev/null | grep -i port
@@ -205,17 +215,20 @@ curl -s -X POST http://<span class="val">CHATUB_URL</span>:8083/api/gateways/aut
     <details class="faq">
       <summary>Q: LAN에서 접근이 안 돼요</summary>
       <div class="answer">
-        Gateway 기본 바인딩은 <code>127.0.0.1</code>(localhost)입니다. LAN 접근을 허용하려면:<br>
-        <code>"gateway": {"bind": "0.0.0.0"}</code>로 변경 후 재시작.
+        1. WiFi가 같은 라우터에 연결되어 있는지 확인<br>
+        2. IP가 <code>192.168.0.x</code> 대역인지 확인 (<code>ip addr</code>)<br>
+        3. Gateway bind가 <code>0.0.0.0</code>인지 확인:<br>
+        <code>"gateway": {"bind": "0.0.0.0"}</code>로 변경 후 재시작
       </div>
     </details>
 
     <details class="faq">
       <summary>Q: Chatub 서버 주소(URL)는 어디인가요?</summary>
       <div class="answer">
-        회장님(관리자)에게 문의하세요. 일반적으로:<br>
-        - 로컬: <code>http://127.0.0.1:8083</code><br>
-        - VPS: <code>http://129.154.63.231:8081</code>
+        <b style="color:#f85149">관제탑은 내부망 전용입니다.</b> 외부에서는 접근할 수 없습니다.<br>
+        - 내부망: <code>http://192.168.0.101:8083</code><br>
+        - VPS(129.154.63.231)는 Rustunnel 터널링용이며, 내부망 에이전트 등록에는 사용하지 마세요.<br>
+        - 같은 WiFi 라우터에 연결되어 있어야 합니다.
       </div>
     </details>
 
