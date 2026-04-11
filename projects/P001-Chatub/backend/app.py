@@ -10,6 +10,8 @@ from pathlib import Path
 
 from pathlib import Path
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
@@ -382,6 +384,19 @@ async def serve_index():
 @app.get("/register1")
 async def serve_register():
     return FileResponse(STATIC_DIR / "register.html")
+
+
+@app.get("/register2")
+async def serve_register2():
+    return FileResponse(STATIC_DIR / "register2.html")
+
+# -- Static files (frontend) --
+
+SRC_DIR = Path(__file__).parent.parent / "src"
+
+@app.get("/")
+async def serve_index():
+    return FileResponse(SRC_DIR / "index.html")
 
 # -- Startup: init DB --
 

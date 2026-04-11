@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chatub — 에이전트 연결 마법사</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}
+
+  /* 헤더 */
+  .header{background:#161b22;border-bottom:1px solid #30363d;padding:20px 0;text-align:center}
+  .header h1{font-size:28px;color:#58a6ff}
+  .header p{color:#8b949e;margin-top:4px;font-size:14px}
+
+  /* 메인 */
+  .container{max-width:900px;margin:40px auto;padding:0 20px}
+
+  /* 등록된 에이전트 */
+  .section-title{font-size:18px;color:#e6edf3;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .agents-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:48px}
+  .agent-card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;transition:border .2s}
+  .agent-card:hover{border-color:#58a6ff}
+  .agent-card .name{font-size:16px;font-weight:600;color:#e6edf3;margin-bottom:4px}
+  .agent-card .url{font-size:12px;color:#8b949e;word-break:break-all;margin-bottom:12px}
+  .agent-card .badges{display:flex;flex-wrap:wrap;gap:6px}
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500}
+  .badge.on{background:#1f3d2d;color:#3fb950}
+  .badge.off{background:#21262d;color:#484f58}
+  .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+  .status-dot.online{background:#3fb950}
+  .status-dot.offline{background:#f85149}
+  .no-agents{text-align:center;padding:40px;color:#484f58;font-size:14px}
+
+  /* 폼 */
+  .form-card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px}
+  .form-card h2{font-size:20px;color:#e6edf3;margin-bottom:4px}
+  .form-card .desc{color:#8b949e;font-size:13px;margin-bottom:24px}
+  .form-row{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:16px}
+  .form-row.full{grid-template-columns:1fr}
+  .form-group{display:flex;flex-direction:column;gap:6px}
+  .form-group label{font-size:12px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.5px}
+  .form-group input{padding:10px 14px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:14px;outline:none;transition:border .2s}
+  .form-group input:focus{border-color:#58a6ff;box-shadow:0 0 0 3px rgba(88,166,255,.15)}
+  .form-group input::placeholder{color:#484f58}
+  .form-actions{display:flex;gap:12px;margin-top:24px}
+  .btn{padding:10px 24px;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+  .btn-primary{background:#238636;color:#fff}
+  .btn-primary:hover{background:#2ea043}
+  .btn-primary:disabled{background:#21262d;color:#484f58;cursor:not-allowed}
+  .btn-secondary{background:#21262d;color:#c9d1d9;border:1px solid #30363d}
+  .btn-secondary:hover{background:#30363d}
+
+  /* 결과 */
+  .result{margin-top:24px;padding:16px 20px;border-radius:8px;font-size:13px;line-height:1.7;display:none}
+  .result.ok{background:#0d2818;border:1px solid #238636;color:#3fb950}
+  .result.err{background:#2d0b0b;border:1px solid #f85149;color:#f85149}
+  .result .detail{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)}
+
+  /* 스텝 */
+  .steps{display:flex;gap:8px;margin-bottom:24px}
+  .step{flex:1;padding:8px;border-radius:6px;text-align:center;font-size:12px;font-weight:600;color:#484f58;background:#0d1117}
+  .step.active{color:#58a6ff;background:#161b22;border:1px solid #30363d}
+  .step.done{color:#3fb950;background:#0d2818}
+
+  @media(max-width:600px){
+    .form-row{grid-template-columns:1fr}
+    .agents-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🐕 Chatub 연결 마법사</h1>
+  <p>OpenClaw 에이전트를 3단계로 관제탑에 연결하세요</p>
+</div>
+
+<div class="container">
+
+  <!-- 스텝 표시 -->
+  <div class="steps">
+    <div class="step active" id="step1">1️⃣ 정보 입력</div>
+    <div class="step" id="step2">2️⃣ 자동 감지</div>
+    <div class="step" id="step3">3️⃣ 등록 완료</div>
+  </div>
+
+  <!-- 등록된 에이전트 목록 -->
+  <div class="section-title">📡 등록된 에이전트</div>
+  <div class="agents-grid" id="agents">
+    <div class="no-agents" id="no-agents">아직 등록된 에이전트가 없습니다</div>
+  </div>
+
+  <!-- 등록 폼 -->
+  <div class="form-card">
+    <h2>🆕 에이전트 추가</h2>
+    <p class="desc">Gateway URL과 토큰을 입력하면 자동으로 기능을 감지합니다</p>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>에이전트 이름</label>
+        <input id="name" placeholder="예: 라이카, 샤오미">
+      </div>
+      <div class="form-group">
+        <label>Gateway URL</label>
+        <input id="url" placeholder="http://192.168.0.101:18789">
+      </div>
+    </div>
+    <div class="form-row full">
+      <div class="form-group">
+        <label>API Key (Gateway Token)</label>
+        <input id="token" type="password" placeholder="Bearer 토큰을 입력하세요">
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" id="btn" onclick="detect()">🔍 감지하기</button>
+      <button class="btn btn-secondary" onclick="reset()">↩️ 초기화</button>
+    </div>
+
+    <div class="result" id="result"></div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+const CAP = {chat:'💬 Chat',streaming:'📡 Stream',tools:'🔧 Tools',sessions:'💻 Sessions',models:'🧠 Models'};
+let detectedData = null;
+
+// 에이전트 목록 로드
+async function loadAgents() {
+  try {
+    const r = await fetch(API_BASE + '/api/gateways/');
+    const d = await r.json();
+    const grid = document.getElementById('agents');
+    const noMsg = document.getElementById('no-agents');
+
+    if (d.ok && d.data.length) {
+      noMsg.style.display = 'none';
+      // 기존 카드 제거 (no-agents 제외)
+      grid.querySelectorAll('.agent-card').forEach(c => c.remove());
+      d.data.forEach(g => {
+        const card = document.createElement('div');
+        card.className = 'agent-card';
+        const h = g.health || {};
+        const caps = g.capabilities || {};
+        const online = h.online;
+        let badges = '';
+        for (const [k, v] of Object.entries(CAP)) {
+          badges += `<span class="badge ${caps[k] ? 'on' : 'off'}">${v}</span>`;
+        }
+        card.innerHTML = `
+          <div class="name"><span class="status-dot ${online ? 'online' : 'offline'}"></span>${g.name}</div>
+          <div class="url">${g.url}</div>
+          <div class="badges">${badges}</div>
+        `;
+        grid.appendChild(card);
+      });
+    } else {
+      noMsg.style.display = 'block';
+    }
+  } catch(e) {}
+}
+
+// 감지
+async function detect() {
+  const name = document.getElementById('name').value.trim();
+  const url  = document.getElementById('url').value.trim();
+  const token = document.getElementById('token').value.trim();
+  const btn  = document.getElementById('btn');
+  const res  = document.getElementById('result');
+
+  if (!name || !url) return alert('이름과 URL을 입력해주세요');
+
+  btn.disabled = true;
+  btn.textContent = '감지 중...';
+  res.style.display = 'none';
+  setStep(2);
+
+  try {
+    const r = await fetch(API_BASE + '/api/gateways/auto-detect', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, url, token})
+    });
+    const d = await r.json();
+    detectedData = d;
+
+    if (!d.ok) {
+      res.className = 'result err';
+      res.innerHTML = '❌ 감지 실패: ' + (d.error || '알 수 없는 오류');
+      setStep(1);
+    } else {
+      const det = d.data.detected;
+      let html = '✅ 감지 성공! ' + (d.data.registered ? '자동 등록되었습니다.' : '');
+      html += '<div class="detail">';
+      html += `<b>${name}</b> — ${det.reachable ? '🟢 연결됨' : '🔴 연결 실패'}`;
+      if (det.version) html += `<br>버전: ${det.version}`;
+      if (det.agents?.length) html += `<br>에이전트: ${det.agents.join(', ')}`;
+
+      if (det.capabilities) {
+        html += '<div class="badges" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">';
+        for (const [k, v] of Object.entries(CAP)) {
+          html += `<span class="badge ${v ? 'on' : 'off'}">${v} ${det.capabilities[k] ? '✓' : '—'}</span>`;
+        }
+        html += '</div>';
+      }
+
+      if (!d.data.registered) {
+        html += `<br><br>자동 등록을 위해 <b>이름(name)</b> 필드가 필요합니다.`;
+      }
+
+      html += '</div>';
+      res.className = 'result ok';
+      res.innerHTML = html;
+      setStep(3);
+      loadAgents();
+    }
+  } catch(e) {
+    res.className = 'result err';
+    res.innerHTML = '❌ 서버 오류: ' + e.message;
+    setStep(1);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🔍 감지하기';
+}
+
+function reset() {
+  document.getElementById('name').value = '';
+  document.getElementById('url').value = '';
+  document.getElementById('token').value = '';
+  document.getElementById('result').style.display = 'none';
+  setStep(1);
+  detectedData = null;
+}
+
+function setStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById('step' + i);
+    el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+  }
+}
+
+// 초기화
+loadAgents();
+</script>
+</body>
+</html>
