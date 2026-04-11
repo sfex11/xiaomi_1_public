@@ -1,12 +1,15 @@
-"""Gateway registry router — register/monitor remote OpenClaw Gateways."""
+"""Gateway registry router — register/monitor remote agent gateways.
+
+CP6: All runtime-specific logic is delegated to AgentAdapter instances.
+"""
 
 import json
-import urllib.request
-import urllib.error
+import asyncio
 import logging
 
 from fastapi import APIRouter, Request
 from db import get_db, new_id, now_ts, row_to_dict, rows_to_list
+from adapters import create_adapter, available_adapters, ProbeResult
 
 router = APIRouter(prefix="/api/gateways", tags=["gateways"])
 log = logging.getLogger("gateways")
@@ -15,81 +18,43 @@ log = logging.getLogger("gateways")
 AGENT_STATES = ("idle", "working", "speaking", "tool_calling", "error")
 
 
-def _query_gateway(gw_url, gw_token, path="/"):
-    """Call an OpenClaw Gateway API endpoint. Returns parsed JSON or None."""
-    url = f"{gw_url.rstrip('/')}{path}"
-    headers = {"Content-Type": "application/json"}
-    if gw_token:
-        headers["Authorization"] = f"Bearer {gw_token}"
-    try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        resp = urllib.request.urlopen(req, timeout=3)
-        return json.loads(resp.read())
-    except Exception as e:
-        log.warning("Gateway query failed: %s %s → %s", gw_url, path, e)
-        return None
+def _adapter_for(gw):
+    """Return the correct adapter for a gateway row."""
+    kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
+    return create_adapter(kind or "openclaw")
 
 
-def _classify_agent_state(gw_url, gw_token, online):
-    """Classify agent state into one of 5 states based on gateway activity."""
-    if not online:
-        return "error"
-
-    # Try /api/sessions to detect active work
-    sessions = _query_gateway(gw_url, gw_token, "/api/sessions")
-    if sessions is None:
-        return "idle"
-
-    # Check session list for activity indicators
-    active_sessions = []
-    if isinstance(sessions, list):
-        active_sessions = sessions
-    elif isinstance(sessions, dict):
-        active_sessions = sessions.get("data", sessions.get("sessions", []))
-
-    if not active_sessions:
-        return "idle"
-
-    for sess in active_sessions:
-        if not isinstance(sess, dict):
-            continue
-        status = sess.get("status", "").lower()
-        if "tool" in status:
-            return "tool_calling"
-        if status in ("generating", "speaking", "streaming"):
-            return "speaking"
-        if status in ("working", "processing", "running"):
-            return "working"
-
-    return "working"
+async def _health_check_async(gw):
+    """Async health check via adapter. Returns legacy-compatible dict."""
+    adapter = _adapter_for(gw)
+    hs = await adapter.health(gw["url"], gw["token"] or "")
+    return {
+        "online": hs.online,
+        "version": hs.version,
+        "agents": hs.agents,
+        "state": hs.state,
+    }
 
 
 def _health_check(gw):
-    """Check if a gateway is reachable. Returns status dict with agent state."""
-    gw_url = gw["url"]
-    gw_token = gw["token"]
-    result = {"online": False, "version": None, "agents": None, "state": "error"}
+    """Sync wrapper for _health_check_async (used by ws.py health loop)."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
 
-    # Try /v1/models as a lightweight health check
-    data = _query_gateway(gw_url, gw_token, "/v1/models")
-    if data is not None:
-        result["online"] = True
-        if isinstance(data, dict):
-            # Extract model list for agents
-            models = data.get("data", [])
-            if isinstance(models, list):
-                result["agents"] = [m.get("id", "") for m in models]
-                result["version"] = f"{len(models)} models" if models else "ok"
-            else:
-                result["version"] = "ok"
-
-    result["state"] = _classify_agent_state(gw_url, gw_token, result["online"])
-    return result
+    if loop and loop.is_running():
+        # We're inside an async context — run in a new thread to avoid blocking
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(lambda: asyncio.run(_health_check_async(gw))).result(timeout=15)
+    else:
+        return asyncio.run(_health_check_async(gw))
 
 
 @router.post("/register")
 async def register_gateway(request: Request):
-    """Register a remote OpenClaw Gateway for monitoring."""
+    """Register a remote agent gateway for monitoring."""
     body = await request.body()
     data = json.loads(body)
 
@@ -97,45 +62,84 @@ async def register_gateway(request: Request):
     url = data.get("url", "").strip()
     token = data.get("token", "").strip()
     port = data.get("port", 18789)
+    kind = data.get("kind", "openclaw").strip()
 
     if not name or not url:
         return {"ok": False, "error": "name and url are required"}
 
-    # Build full URL if port specified
     if port and ":" not in url.split("//")[-1]:
         url = f"{url.rstrip('/')}:{port}"
 
     db = get_db()
     try:
-        # Check if already registered by name
         existing = db.execute("SELECT id FROM gateways WHERE name=?", (name,)).fetchone()
         if existing:
             gid = existing["id"]
             db.execute(
-                "UPDATE gateways SET url=?, token=?, updated_at=? WHERE id=?",
-                (url, token, now_ts(), gid)
+                "UPDATE gateways SET url=?, token=?, kind=?, updated_at=? WHERE id=?",
+                (url, token, kind, now_ts(), gid)
             )
-            log.info("Updated gateway: %s (%s)", name, url)
+            log.info("Updated gateway: %s (%s) kind=%s", name, url, kind)
         else:
             gid = new_id()
             db.execute(
-                "INSERT INTO gateways (id, name, url, token, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-                (gid, name, url, token, now_ts(), now_ts())
+                "INSERT INTO gateways (id, name, url, token, kind, capabilities, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (gid, name, url, token, kind, "{}", now_ts(), now_ts())
             )
-            log.info("Registered gateway: %s (%s)", name, url)
+            log.info("Registered gateway: %s (%s) kind=%s", name, url, kind)
 
         db.commit()
 
-        # Run health check
         gw = db.execute("SELECT * FROM gateways WHERE id=?", (gid,)).fetchone()
-        health = _health_check(gw)
+        health = await _health_check_async(gw)
 
-        return {"ok": True, "data": {"id": gid, "name": name, "url": url, "health": health}}
+        return {"ok": True, "data": {"id": gid, "name": name, "url": url, "kind": kind, "health": health}}
     except Exception as e:
         db.rollback()
         return {"ok": False, "error": str(e)}
     finally:
         db.close()
+
+
+@router.post("/auto-detect")
+async def auto_detect(request: Request):
+    """Probe a URL, detect runtime kind + capabilities, return ProbeResult."""
+    body = await request.body()
+    data = json.loads(body)
+
+    url = data.get("url", "").strip()
+    token = data.get("token", "").strip()
+
+    if not url:
+        return {"ok": False, "error": "url is required"}
+
+    # Try each registered adapter until one succeeds
+    for kind in available_adapters():
+        adapter = create_adapter(kind)
+        probe = await adapter.probe(url, token)
+        if probe.reachable:
+            return {
+                "ok": True,
+                "data": {
+                    "kind": probe.kind,
+                    "version": probe.version,
+                    "agents": probe.agents,
+                    "capabilities": probe.capabilities,
+                    "error": None,
+                },
+            }
+
+    # All adapters failed — return last probe result
+    return {
+        "ok": False,
+        "error": probe.error or "UNSUPPORTED_API",
+        "data": {
+            "kind": "unknown",
+            "capabilities": {},
+            "error": probe.error or "UNSUPPORTED_API",
+        },
+    }
 
 
 @router.get("/stats")
@@ -164,15 +168,21 @@ async def list_gateways():
     """List all registered gateways with health status and token stats."""
     db = get_db()
     try:
-        rows = db.execute("SELECT id, name, url, created_at, updated_at FROM gateways ORDER BY name").fetchall()
+        rows = db.execute(
+            "SELECT id, name, url, kind, capabilities, created_at, updated_at "
+            "FROM gateways ORDER BY name"
+        ).fetchall()
         gateways = []
         for row in rows:
             gw = dict(row)
-            # Get full record for health check (includes token)
             full = db.execute("SELECT * FROM gateways WHERE id=?", (row["id"],)).fetchone()
-            health = _health_check(full)
+            health = await _health_check_async(full)
             gw["health"] = health
-            # Token usage stats for this gateway
+            # Parse capabilities JSON
+            try:
+                gw["capabilities"] = json.loads(gw.get("capabilities") or "{}")
+            except (json.JSONDecodeError, TypeError):
+                gw["capabilities"] = {}
             stats = db.execute(
                 "SELECT SUM(tokens_prompt) AS prompt_tokens, "
                 "SUM(tokens_completion) AS completion_tokens, "
@@ -307,7 +317,7 @@ async def check_health(gateway_id: str):
         gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
         if not gw:
             return {"ok": False, "error": "Gateway not found"}
-        health = _health_check(gw)
+        health = await _health_check_async(gw)
         return {"ok": True, "data": {"id": gateway_id, "name": gw["name"], "health": health}}
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -317,18 +327,16 @@ async def check_health(gateway_id: str):
 
 @router.get("/{gateway_id}/agents")
 async def get_gateway_agents(gateway_id: str):
-    """Get agents list from a specific gateway."""
+    """Get agents list from a specific gateway via adapter."""
     db = get_db()
     try:
         gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
         if not gw:
             return {"ok": False, "error": "Gateway not found"}
 
-        data = _query_gateway(gw["url"], gw["token"], "/v1/models")
-        if data is None:
-            return {"ok": False, "error": "Gateway unreachable"}
-
-        return {"ok": True, "data": data}
+        adapter = _adapter_for(gw)
+        models = await adapter.list_models(gw["url"], gw["token"] or "")
+        return {"ok": True, "data": {"data": models}}
     except Exception as e:
         return {"ok": False, "error": str(e)}
     finally:
@@ -337,21 +345,18 @@ async def get_gateway_agents(gateway_id: str):
 
 @router.get("/{gateway_id}/sessions")
 async def get_gateway_sessions(gateway_id: str):
-    """Get sessions list from a specific gateway."""
+    """Get sessions list from a specific gateway via adapter."""
     db = get_db()
     try:
         gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
         if not gw:
             return {"ok": False, "error": "Gateway not found"}
 
-        data = _query_gateway(gw["url"], gw["token"], "/api/sessions")
-        if data is None:
-            data = _query_gateway(gw["url"], gw["token"], "/v1/models")
-            if data is None:
-                return {"ok": False, "error": "Gateway unreachable"}
+        adapter = _adapter_for(gw)
+        sessions = await adapter.list_sessions(gw["url"], gw["token"] or "")
+        if not sessions:
             return {"ok": True, "data": {"note": "sessions endpoint not available", "status": "online"}}
-
-        return {"ok": True, "data": data}
+        return {"ok": True, "data": sessions}
     except Exception as e:
         return {"ok": False, "error": str(e)}
     finally:
@@ -367,15 +372,20 @@ async def get_gateway_history(gateway_id: str, limit: int = 20):
         if not gw:
             return {"ok": False, "error": "Gateway not found"}
 
-        data = _query_gateway(gw["url"], gw["token"], "/api/history?limit=" + str(limit))
-        if data is not None:
-            return {"ok": True, "data": data}
+        # History is not part of the adapter interface (OpenClaw-specific)
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=10) as c:
+                headers = {"Content-Type": "application/json"}
+                if gw["token"]:
+                    headers["Authorization"] = f"Bearer {gw['token']}"
+                r = await c.get(f"{gw['url'].rstrip('/')}/api/history?limit={limit}", headers=headers)
+                if r.status_code < 400:
+                    return {"ok": True, "data": r.json()}
+        except Exception:
+            pass
 
-        data = _query_gateway(gw["url"], gw["token"], "/v1/models")
-        if data is None:
-            return {"ok": False, "error": "Gateway unreachable"}
-
-        return {"ok": True, "data": {"note": "history endpoint not available", "models": data}}
+        return {"ok": True, "data": {"note": "history endpoint not available"}}
     except Exception as e:
         return {"ok": False, "error": str(e)}
     finally:

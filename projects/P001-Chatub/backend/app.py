@@ -117,186 +117,155 @@ async def handle_chat(request: Request):
         return JSONResponse(content={"error": str(e)}, status_code=502)
 
 
-# -- OpenClaw Gateway chat proxy (HTTP /v1/chat/completions) --
+# -- OpenClaw Gateway chat proxy (via Adapter) --
 
 import os
+import logging
+
+from adapters import create_adapter
 
 GW_BASE_URL = os.getenv("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789")
 GW_TOKEN = os.getenv("OPENCLAW_GATEWAY_TOKEN", "05f47308205c82c727a7db35a838a2a0df12c5df21576610")
 
-import logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [chat-proxy] %(message)s")
 log = logging.getLogger("gateway-chat")
 
 
+def _resolve_gateway(gateway_id):
+    """Resolve gateway (url, token, name, id, kind) from DB or env defaults."""
+    if not gateway_id:
+        return GW_BASE_URL, GW_TOKEN, "default", "default", "openclaw"
+    db = get_db()
+    try:
+        gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
+        if not gw:
+            return None, None, None, None, None
+        kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
+        return gw["url"], gw["token"] or "", gw["name"], gw["id"], kind or "openclaw"
+    finally:
+        db.close()
+
+
+def _log_chat(gw_id, gw_name, messages, assistant_content, model, usage):
+    """Save user messages + assistant response to chat_logs."""
+    try:
+        db = get_db()
+        try:
+            for m in messages:
+                db.execute(
+                    "INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,created_at) VALUES (?,?,?,?,?,?)",
+                    (new_id(), gw_id, gw_name, m.get("role", "user"), m.get("content", ""), now_ts()))
+            db.execute(
+                "INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,model,tokens_prompt,tokens_completion,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                (new_id(), gw_id, gw_name, "assistant", assistant_content, model,
+                 usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), now_ts()))
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        log.warning("chat log save failed: %s", e)
+
+
 @app.post("/api/gateway-chat")
 async def handle_gateway_chat(request: Request):
-    """Proxy chat to any registered Gateway /v1/chat/completions, return SSE stream.
+    """Proxy chat to any registered Gateway via Adapter.
     Supports multi-gateway: specify gateway_id to route to a specific gateway.
     Falls back to default (localhost) Gateway if no gateway_id provided.
     """
     body = await request.body()
     data = json.loads(body)
     gateway_id = data.pop("gateway_id", None)
-    log.info("▶ request received: messages=%d, gateway_id=%s", len(data.get("messages", [])), gateway_id)
-
-    # Resolve gateway URL and token
-    gw_url = GW_BASE_URL
-    gw_token = GW_TOKEN
-
-    if gateway_id:
-        from db import get_db
-        db = get_db()
-        try:
-            gw = db.execute("SELECT url, token FROM gateways WHERE id=?", (gateway_id,)).fetchone()
-            if gw:
-                gw_url = gw["url"]
-                gw_token = gw["token"] or ""
-                log.info("▶ routing to gateway: %s (%s)", gateway_id, gw_url)
-            else:
-                return JSONResponse({"ok": False, "error": f"Gateway {gateway_id} not found"}, status_code=404)
-        finally:
-            db.close()
-
-    headers = {"Content-Type": "application/json"}
-    if gw_token:
-        headers["Authorization"] = f"Bearer {gw_token}"
-        log.info("▶ using token: ...%s", gw_token[-6:])
-    else:
-        log.info("▶ no token configured")
-
+    messages = data.get("messages", [])
     is_stream = data.get("stream", True)
+    log.info("▶ request: messages=%d, gateway_id=%s, stream=%s", len(messages), gateway_id, is_stream)
+
+    gw_url, gw_token, gw_name, gw_id, kind = _resolve_gateway(gateway_id)
+    if gw_url is None:
+        return JSONResponse({"ok": False, "error": f"Gateway {gateway_id} not found"}, status_code=404)
+
+    adapter = create_adapter(kind)
+
     if is_stream:
+        # SSE pass-through: build streaming response via adapter
         data["stream"] = True
+        extra = {k: v for k, v in data.items() if k not in ("messages", "stream")}
 
-    target = f"{gw_url}/v1/chat/completions"
-    log.info("▶ proxying to %s (stream=%s)", target, is_stream)
-
-    try:
-        req = urllib.request.Request(
-            target,
-            data=json.dumps(data).encode(),
-            headers=headers,
-            method="POST",
-        )
-        resp = urllib.request.urlopen(req, timeout=120)
-        log.info("▶ Gateway response: status=%d", resp.status)
-
-        if is_stream:
-            def generate():
-                total_bytes = 0
-                while True:
-                    chunk = resp.read(1024)
-                    if not chunk:
-                        break
-                    total_bytes += len(chunk)
-                    log.info("▶ chunk: %d bytes (total: %d)", len(chunk), total_bytes)
-                    yield chunk
-                log.info("▶ stream complete: %d total bytes", total_bytes)
-
-            return StreamingResponse(
-                generate(),
-                media_type="text/event-stream",
-                headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
-            )
-        else:
-            result = resp.read()
-            log.info("▶ Gateway response body: %s", result[:500])
-            parsed = json.loads(result)
-
-            # Log chat to DB
+        async def generate():
+            full_content = ""
+            model = ""
+            usage = {}
             try:
-                from db import get_db, new_id, now_ts
-                db = get_db()
-                msgs = data.get("messages", [])
-                for m in msgs:
-                    db.execute(
-                        "INSERT INTO chat_logs (id, gateway_id, gateway_name, role, content, created_at) VALUES (?,?,?,?,?,?)",
-                        (new_id(), gateway_id or "default", "", m.get("role", "user"), m.get("content", ""), now_ts())
-                    )
-                # Log assistant response
-                choices = parsed.get("choices", [])
-                if choices:
-                    aid = choices[0].get("message", {}).get("content", "")
-                    usage = parsed.get("usage", {})
-                    db.execute(
-                        "INSERT INTO chat_logs (id, gateway_id, gateway_name, role, content, model, tokens_prompt, tokens_completion, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                        (new_id(), gateway_id or "default", "", "assistant", aid, parsed.get("model", ""), usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), now_ts())
-                    )
-                db.commit()
-                db.close()
+                async for event in adapter._stream(gw_url.rstrip("/"), gw_token, {**data}):
+                    if event["type"] == "chunk":
+                        # Re-encode as SSE line for HTTP clients
+                        sse = json.dumps({"choices": [{"delta": {"content": event["content"]}}]})
+                        yield f"data: {sse}\n\n"
+                        full_content += event["content"]
+                    elif event["type"] == "done":
+                        full_content = event["content"]
+                        model = event.get("model", "")
+                        usage = event.get("usage", {})
+                        yield "data: [DONE]\n\n"
             except Exception as e:
-                log.warning("▶ chat log save failed: %s", e)
+                log.error("stream error: %s", e)
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            _log_chat(gw_id, gw_name or "", messages, full_content, model, usage)
 
-            return JSONResponse(content=parsed,
-                headers={"Cache-Control": "no-cache"},
-            )
-
-    except urllib.error.HTTPError as e:
-        log.error("▶ HTTP error: %d %s", e.code, e.read()[:500])
-        error_body = e.read()
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+        )
+    else:
         try:
-            error_json = json.loads(error_body)
-        except Exception:
-            error_json = {"error": error_body.decode(errors="replace")}
-        return JSONResponse(content=error_json, status_code=e.code)
-    except Exception as e:
-        log.error("▶ Exception: %s", str(e))
-        return JSONResponse(content={"error": str(e)}, status_code=502)
+            extra = {k: v for k, v in data.items() if k not in ("messages",)}
+            resp = await adapter.send_message(gw_url, gw_token, messages, stream=False, **extra)
+            _log_chat(gw_id, gw_name or "", messages, resp.content, resp.model, resp.usage)
+            return JSONResponse(content=resp.raw, headers={"Cache-Control": "no-cache"})
+        except httpx.HTTPStatusError as e:
+            return JSONResponse(content={"error": str(e)}, status_code=e.response.status_code)
+        except Exception as e:
+            log.error("Exception: %s", e)
+            return JSONResponse(content={"error": str(e)}, status_code=502)
 
 
-# -- Broadcast chat to all online gateways --
+# -- Broadcast chat to all online gateways (via Adapter) --
 
 @app.post("/api/gateway-broadcast")
 async def handle_broadcast(request: Request):
-    """Send message to all online gateways, return all responses."""
+    """Send message to all online gateways via Adapter, return all responses."""
     body = await request.body()
     data = json.loads(body)
-    gateway_id = data.pop("gateway_id", None)  # optional: specific gateway
+    gateway_id = data.pop("gateway_id", None)
     broadcast = data.pop("broadcast", True)
-    log.info("▶ broadcast request: messages=%d, broadcast=%s, gateway_id=%s", len(data.get("messages", [])), broadcast, gateway_id)
+    messages = data.get("messages", [])
+    log.info("▶ broadcast: messages=%d, broadcast=%s, gateway_id=%s", len(messages), broadcast, gateway_id)
 
-    from db import get_db
     db = get_db()
     try:
         if gateway_id:
-            rows = db.execute("SELECT id, name, url, token FROM gateways WHERE id=?", (gateway_id,)).fetchall()
-        elif broadcast:
-            rows = db.execute("SELECT id, name, url, token FROM gateways").fetchall()
+            rows = db.execute("SELECT id, name, url, token, kind FROM gateways WHERE id=?", (gateway_id,)).fetchall()
         else:
-            # Default: only online gateways
-            rows = db.execute("SELECT id, name, url, token FROM gateways").fetchall()
+            rows = db.execute("SELECT id, name, url, token, kind FROM gateways").fetchall()
 
         async def query_one(gw):
-            gw_url, gw_token, gw_name, gw_id = gw["url"], gw["token"] or "", gw["name"], gw["id"]
-            headers = {"Content-Type": "application/json"}
-            if gw_token:
-                headers["Authorization"] = f"Bearer {gw_token}"
+            gw_id, gw_name = gw["id"], gw["name"]
+            gw_url, gw_token = gw["url"], gw["token"] or ""
+            kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
+            adapter = create_adapter(kind or "openclaw")
             try:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    resp = await client.post(f"{gw_url}/v1/chat/completions", json=data, headers=headers)
-                    resp.raise_for_status()
-                    parsed = resp.json()
-                    content = parsed.get("choices", [{}])[0].get("message", {}).get("content", "")
-                    usage = parsed.get("usage", {})
-                    # Log to DB
-                    for m in data.get("messages", []):
-                        db.execute(
-                            "INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,created_at) VALUES (?,?,?,?,?,?)",
-                            (new_id(), gw_id, gw_name, m.get("role","user"), m.get("content",""), now_ts()))
-                    db.execute(
-                        "INSERT INTO chat_logs (id,gateway_id,gateway_name,role,content,model,tokens_prompt,tokens_completion,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                        (new_id(), gw_id, gw_name, "assistant", content, parsed.get("model",""), usage.get("prompt_tokens",0), usage.get("completion_tokens",0), now_ts()))
-                    db.commit()
-                    return {"name": gw_name, "id": gw_id, "ok": True, "content": content, "model": parsed.get("model",""), "usage": usage}
+                extra = {k: v for k, v in data.items() if k not in ("messages",)}
+                resp = await adapter.send_message(gw_url, gw_token, messages, stream=False, **extra)
+                _log_chat(gw_id, gw_name, messages, resp.content, resp.model, resp.usage)
+                return {"name": gw_name, "id": gw_id, "ok": True,
+                        "content": resp.content, "model": resp.model, "usage": resp.usage}
             except Exception as e:
-                log.warning("▶ broadcast to %s (%s) failed: %s", gw_name, gw_url, e)
+                log.warning("broadcast to %s (%s) failed: %s", gw_name, gw_url, e)
                 return {"name": gw_name, "id": gw_id, "ok": False, "error": str(e)}
 
         results = await asyncio.gather(*[query_one(row) for row in rows])
         result_list = list(results)
 
-        # Push broadcast results to /ws/status subscribers
         from routers.ws import status_manager
         await status_manager.push("broadcast", {"results": result_list})
 

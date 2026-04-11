@@ -115,21 +115,21 @@ class StatusManager:
             self.clients.discard(ws)
 
     async def _health_loop(self):
-        """Every 10 seconds, query all gateways and push status."""
-        from routers.gateways import _health_check
+        """Every 10 seconds, query all gateways and push status via adapter."""
+        from routers.gateways import _health_check_async
         while self.clients:
             try:
                 db = get_db()
                 try:
                     rows = db.execute(
-                        "SELECT id, name, url, token FROM gateways ORDER BY name"
+                        "SELECT * FROM gateways ORDER BY name"
                     ).fetchall()
                 finally:
                     db.close()
 
                 statuses = []
                 for row in rows:
-                    health = _health_check(row)
+                    health = await _health_check_async(row)
                     statuses.append({
                         "id": row["id"],
                         "name": row["name"],
@@ -208,18 +208,18 @@ _RPC_METHODS: Dict[str, object] = {}
 
 def _register_rpc_methods():
     """Populate the RPC method table (called once at module load)."""
-    from routers.gateways import _health_check
+    from routers.gateways import _health_check_async
 
     async def agents_list(params):
-        """Return all gateways with health + agent state."""
+        """Return all gateways with health + agent state via adapter."""
         db = get_db()
         try:
             rows = db.execute(
-                "SELECT id, name, url, token FROM gateways ORDER BY name"
+                "SELECT * FROM gateways ORDER BY name"
             ).fetchall()
             result = []
             for row in rows:
-                health = _health_check(row)
+                health = await _health_check_async(row)
                 result.append({
                     "id": row["id"],
                     "name": row["name"],
@@ -305,56 +305,37 @@ async def ws_rpc(ws: WebSocket):
 # ---------------------------------------------------------------------------
 
 async def _stream_one_gateway(ws: WebSocket, gw_id: str, gw_name: str,
-                              gw_url: str, gw_token: str, payload: dict):
-    """Stream SSE from a single Gateway and relay chunks over WebSocket.
+                              gw_url: str, gw_token: str, kind: str,
+                              payload: dict):
+    """Stream from a Gateway via Adapter and relay chunks over WebSocket.
 
     Sends:
       {"type":"chat.chunk","gateway_id":"...","content":"..."}
       {"type":"chat.done","gateway_id":"...","full":"전체응답"}
     Returns (gw_id, gw_name, full_content, model, usage) or raises.
     """
-    headers = {"Content-Type": "application/json"}
-    if gw_token:
-        headers["Authorization"] = f"Bearer {gw_token}"
+    from adapters import create_adapter
+
+    adapter = create_adapter(kind or "openclaw")
+    messages = payload.get("messages", [])
+    extra = {k: v for k, v in payload.items() if k not in ("messages", "stream")}
 
     full_content = ""
     model = ""
     usage = {}
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(120, connect=10)) as client:
-        async with client.stream(
-            "POST", f"{gw_url}/v1/chat/completions",
-            json={**payload, "stream": True}, headers=headers,
-        ) as resp:
-            resp.raise_for_status()
-            buf = ""
-            async for raw in resp.aiter_text():
-                buf += raw
-                while "\n" in buf:
-                    line, buf = buf.split("\n", 1)
-                    line = line.strip()
-                    if not line or not line.startswith("data:"):
-                        continue
-                    data_str = line[len("data:"):].strip()
-                    if data_str == "[DONE]":
-                        continue
-                    try:
-                        chunk = json.loads(data_str)
-                    except (json.JSONDecodeError, ValueError):
-                        continue
-                    delta = (chunk.get("choices") or [{}])[0].get("delta", {})
-                    content = delta.get("content", "")
-                    if not model:
-                        model = chunk.get("model", "")
-                    if chunk.get("usage"):
-                        usage = chunk["usage"]
-                    if content:
-                        full_content += content
-                        await ws.send_text(json.dumps({
-                            "type": "chat.chunk",
-                            "gateway_id": gw_id,
-                            "content": content,
-                        }, ensure_ascii=False))
+    async for event in adapter._stream(gw_url.rstrip("/"), gw_token, {**payload, "stream": True}):
+        if event["type"] == "chunk":
+            full_content += event["content"]
+            await ws.send_text(json.dumps({
+                "type": "chat.chunk",
+                "gateway_id": gw_id,
+                "content": event["content"],
+            }, ensure_ascii=False))
+        elif event["type"] == "done":
+            full_content = event["content"]
+            model = event.get("model", "")
+            usage = event.get("usage", {})
 
     await ws.send_text(json.dumps({
         "type": "chat.done",
@@ -428,7 +409,7 @@ async def ws_chat(ws: WebSocket):
             try:
                 if gateway_id:
                     rows = db.execute(
-                        "SELECT id, name, url, token FROM gateways WHERE id=?",
+                        "SELECT id, name, url, token, kind FROM gateways WHERE id=?",
                         (gateway_id,)).fetchall()
                     if not rows:
                         await ws.send_text(json.dumps(
@@ -438,7 +419,7 @@ async def ws_chat(ws: WebSocket):
                         continue
                 elif broadcast:
                     rows = db.execute(
-                        "SELECT id, name, url, token FROM gateways").fetchall()
+                        "SELECT id, name, url, token, kind FROM gateways").fetchall()
                     if not rows:
                         await ws.send_text(json.dumps(
                             {"type": "chat.error", "gateway_id": "",
@@ -459,9 +440,11 @@ async def ws_chat(ws: WebSocket):
 
             async def _relay(gw):
                 gid, gname = gw["id"], gw["name"]
+                kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
                 try:
                     result = await _stream_one_gateway(
-                        ws, gid, gname, gw["url"], gw["token"] or "", payload)
+                        ws, gid, gname, gw["url"], gw["token"] or "",
+                        kind or "openclaw", payload)
                     _save_chat_log(gid, gname, messages,
                                    result[2], result[3], result[4])
                 except httpx.HTTPStatusError as e:

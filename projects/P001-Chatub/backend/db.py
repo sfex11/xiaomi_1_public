@@ -202,6 +202,13 @@ MIGRATIONS = [
     """
     ALTER TABLE ai_bots ADD COLUMN permissions TEXT DEFAULT 'read,write';
     """,
+    # CP6: Agent Adapter — kind + capabilities on gateways
+    """
+    ALTER TABLE gateways ADD COLUMN kind TEXT DEFAULT 'openclaw';
+    """,
+    """
+    ALTER TABLE gateways ADD COLUMN capabilities TEXT DEFAULT '{}';
+    """,
 ]
 
 
