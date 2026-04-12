@@ -4799,7 +4799,7 @@ function updateLastCheck() {
   if (el) el.textContent = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-// -- TopBar Stats --
+// -- TopBar Stats (P1-DOM: diff update) --
 function renderTopBarStats() {
   var el = $('ctrl-topbar-stats');
   if (!el) return;
@@ -4812,10 +4812,51 @@ function renderTopBarStats() {
   if (counts.pairing) pills.push('<span class="ctrl-stat-pill st-pairing"><span class="dot-sm"></span>' + counts.pairing + ' 페어링</span>');
   if (counts.disconnected) pills.push('<span class="ctrl-stat-pill st-disconnected"><span class="dot-sm"></span>' + counts.disconnected + ' 오프라인</span>');
   pills.push('<span class="ctrl-badge-sm default">' + totalAgents + ' gateways</span>');
-  el.innerHTML = pills.join('');
+  var newHtml = pills.join('');
+  if (el.innerHTML !== newHtml) el.innerHTML = newHtml;
 }
 
-// -- Side Panel: Gateway List --
+// -- Side Panel: Gateway List (P1-DOM: diff update per gateway card) --
+function _buildGwCardHtml(gw) {
+  var meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: '', color: 'var(--accent)' };
+  var status = getGwStatus(gw);
+  var statusText = getGwStatusText(status);
+  var badgeCls = getGwStatusBadgeClass(status);
+  var latencyMs = gw.health && gw.health.latencyMs;
+  var latencyStr = latencyMs != null ? latencyMs + 'ms' : '—';
+  var selected = ctrlSelectedGw && ctrlSelectedGw.id === gw.id ? ' selected' : '';
+  var borderCls = status === 'online' ? ' border-success' : status === 'error' ? ' border-danger' : status === 'pairing' ? ' border-info' : '';
+  var expanded = ctrlGwAgentsExpanded[gw.id];
+  var agentCount = (gw.health && gw.health.agentCount) || 0;
+
+  var agentListHtml = '';
+  if (expanded && gw.health && gw.health.agents && gw.health.agents.length) {
+    agentListHtml = '<div class="ctrl-gw-agent-list">' + gw.health.agents.map(function(a) {
+      return '<div class="ctrl-gw-agent-item"><span>' + (a.emoji || '🤖') + '</span><span style="font-weight:500;">' + escapeHtml(a.name || a.id) + '</span><span class="agent-id">' + (a.id || '').slice(0, 8) + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  return '<div class="ctrl-gw-card' + selected + borderCls + '" data-gw-id="' + gw.id + '" onclick="ctrlSelectGw(\'' + gw.id + '\')" ondblclick="ctrlHealthCheck(\'' + gw.id + '\')">' +
+    '<div class="ctrl-gw-card-head">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">' +
+          '<span class="ctrl-gw-name">' + meta.emoji + ' ' + escapeHtml(gw.name) + '</span>' +
+          '<span class="ctrl-badge-sm ' + badgeCls + '">' + statusText + '</span>' +
+        '</div>' +
+        '<div class="ctrl-gw-url">' + escapeHtml(gw.url) + '</div>' +
+      '</div>' +
+      '<button class="ctrl-topbar-btn ghost" onclick="event.stopPropagation();ctrlHealthCheck(\'' + gw.id + '\')" title="Health Check" style="padding:4px;">↻</button>' +
+    '</div>' +
+    '<div class="ctrl-gw-metrics">' +
+      '<span>⏱ ' + latencyStr + '</span>' +
+      '<span>🤖 ' + agentCount + ' agents</span>' +
+      '<div class="ctrl-cap-row" style="margin-top:0;">' + renderCapBadges(gw) + '</div>' +
+    '</div>' +
+    (agentCount > 0 ? '<button class="ctrl-gw-agents-toggle" onclick="event.stopPropagation();ctrlToggleAgents(\'' + gw.id + '\')">' + (expanded ? '▾' : '▸') + ' agents (' + agentCount + ')</button>' : '') +
+    agentListHtml +
+  '</div>';
+}
+
 function renderSideList() {
   var list = $('ctrl-side-list');
   var countEl = $('ctrl-gw-count');
@@ -4829,45 +4870,49 @@ function renderSideList() {
     return;
   }
 
-  list.innerHTML = ctrlGateways.map(function(gw) {
-    var meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: '', color: 'var(--accent)' };
-    var status = getGwStatus(gw);
-    var statusText = getGwStatusText(status);
-    var badgeCls = getGwStatusBadgeClass(status);
-    var latencyMs = gw.health && gw.health.latencyMs;
-    var latencyStr = latencyMs != null ? latencyMs + 'ms' : '—';
-    var selected = ctrlSelectedGw && ctrlSelectedGw.id === gw.id ? ' selected' : '';
-    var borderCls = status === 'online' ? ' border-success' : status === 'error' ? ' border-danger' : status === 'pairing' ? ' border-info' : '';
-    var expanded = ctrlGwAgentsExpanded[gw.id];
-    var agentCount = (gw.health && gw.health.agentCount) || 0;
+  // P1-DOM: diff update — only update changed cards, add/remove as needed
+  var existingCards = list.querySelectorAll('.ctrl-gw-card[data-gw-id]');
+  var existingMap = {};
+  for (var i = 0; i < existingCards.length; i++) {
+    existingMap[existingCards[i].getAttribute('data-gw-id')] = existingCards[i];
+  }
 
-    var agentListHtml = '';
-    if (expanded && gw.health && gw.health.agents && gw.health.agents.length) {
-      agentListHtml = '<div class="ctrl-gw-agent-list">' + gw.health.agents.map(function(a) {
-        return '<div class="ctrl-gw-agent-item"><span>' + (a.emoji || '🤖') + '</span><span style="font-weight:500;">' + escapeHtml(a.name || a.id) + '</span><span class="agent-id">' + (a.id || '').slice(0, 8) + '</span></div>';
-      }).join('') + '</div>';
+  var gwIds = new Set();
+  var fragment = document.createDocumentFragment();
+  var needsFullRebuild = existingCards.length === 0;
+
+  if (needsFullRebuild) {
+    // First render: build all at once
+    var tmp = document.createElement('div');
+    tmp.innerHTML = ctrlGateways.map(_buildGwCardHtml).join('');
+    while (tmp.firstChild) fragment.appendChild(tmp.firstChild);
+    list.innerHTML = '';
+    list.appendChild(fragment);
+    return;
+  }
+
+  // Incremental diff: update existing, add new, remove stale
+  ctrlGateways.forEach(function(gw) {
+    gwIds.add(gw.id);
+    var newHtml = _buildGwCardHtml(gw);
+    var existing = existingMap[gw.id];
+    if (existing) {
+      if (existing.outerHTML !== newHtml) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = newHtml;
+        list.replaceChild(tmp.firstChild, existing);
+      }
+    } else {
+      var tmp = document.createElement('div');
+      tmp.innerHTML = newHtml;
+      list.appendChild(tmp.firstChild);
     }
+  });
 
-    return '<div class="ctrl-gw-card' + selected + borderCls + '" onclick="ctrlSelectGw(\'' + gw.id + '\')" ondblclick="ctrlHealthCheck(\'' + gw.id + '\')">' +
-      '<div class="ctrl-gw-card-head">' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">' +
-            '<span class="ctrl-gw-name">' + meta.emoji + ' ' + escapeHtml(gw.name) + '</span>' +
-            '<span class="ctrl-badge-sm ' + badgeCls + '">' + statusText + '</span>' +
-          '</div>' +
-          '<div class="ctrl-gw-url">' + escapeHtml(gw.url) + '</div>' +
-        '</div>' +
-        '<button class="ctrl-topbar-btn ghost" onclick="event.stopPropagation();ctrlHealthCheck(\'' + gw.id + '\')" title="Health Check" style="padding:4px;">↻</button>' +
-      '</div>' +
-      '<div class="ctrl-gw-metrics">' +
-        '<span>⏱ ' + latencyStr + '</span>' +
-        '<span>🤖 ' + agentCount + ' agents</span>' +
-        '<div class="ctrl-cap-row" style="margin-top:0;">' + renderCapBadges(gw) + '</div>' +
-      '</div>' +
-      (agentCount > 0 ? '<button class="ctrl-gw-agents-toggle" onclick="event.stopPropagation();ctrlToggleAgents(\'' + gw.id + '\')">' + (expanded ? '▾' : '▸') + ' agents (' + agentCount + ')</button>' : '') +
-      agentListHtml +
-    '</div>';
-  }).join('');
+  // Remove cards for gateways no longer in list
+  for (var id in existingMap) {
+    if (!gwIds.has(id)) existingMap[id].remove();
+  }
 }
 
 function ctrlToggleAgents(gwId) {
@@ -4940,47 +4985,63 @@ async function ctrlHealthCheck(gwId) {
 }
 
 // -- Detail View (right main area) --
+// P1-DOM: track last rendered detail gateway to skip static re-renders
+var _lastDetailGwId = null;
+var _lastDetailTab = null;
+
 function renderDetailView() {
   var empty = $('ctrl-detail-empty');
   var content = $('ctrl-detail-content');
   if (!ctrlSelectedGw) {
     if (empty) empty.style.display = 'flex';
     if (content) content.style.display = 'none';
+    _lastDetailGwId = null;
+    _lastDetailTab = null;
     return;
   }
   if (empty) empty.style.display = 'none';
   if (content) content.style.display = 'flex';
 
   var gw = ctrlSelectedGw;
+  var sameGw = _lastDetailGwId === gw.id;
+  var sameTab = _lastDetailTab === ctrlDetailTab;
   var meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: 'Agent', color: 'var(--accent)' };
   var status = getGwStatus(gw);
   var statusText = getGwStatusText(status);
   var badgeCls = getGwStatusBadgeClass(status);
 
-  // Header
+  // P1-DOM: Only update header if gateway changed or status changed
   var headEl = $('ctrl-detail-head');
   if (headEl) {
-    headEl.innerHTML = '<h4>' + meta.emoji + ' ' + escapeHtml(gw.name) +
+    var newHeadHtml = '<h4>' + meta.emoji + ' ' + escapeHtml(gw.name) +
       ' <span style="font-size:11px;font-weight:400;color:var(--text-secondary);">' + (meta.role || 'Agent') + '</span>' +
       ' <span class="ctrl-badge-sm ' + badgeCls + '" style="margin-left:6px;">' + statusText + '</span></h4>' +
       '<button class="ctrl-detail-close" onclick="ctrlSelectGw(\'' + gw.id + '\')" title="닫기">✕</button>';
+    if (headEl.innerHTML !== newHeadHtml) headEl.innerHTML = newHeadHtml;
   }
 
-  // Tabs
-  var tabs = [
-    { id: 'overview', label: '개요' },
-    { id: 'sessions', label: '세션' },
-    { id: 'files', label: '파일' },
-    { id: 'chat', label: '채팅' },
-  ];
-  var tabsEl = $('ctrl-detail-tabs-bar');
-  if (tabsEl) {
-    tabsEl.innerHTML = tabs.map(function(t) {
-      return '<button class="ctrl-detail-tab' + (ctrlDetailTab === t.id ? ' active' : '') + '" onclick="ctrlSwitchDetailTab(\'' + t.id + '\')">' + t.label + '</button>';
-    }).join('');
+  // P1-DOM: Only update tabs if gateway or tab changed
+  if (!sameGw || !sameTab) {
+    var tabs = [
+      { id: 'overview', label: '개요' },
+      { id: 'sessions', label: '세션' },
+      { id: 'files', label: '파일' },
+      { id: 'chat', label: '채팅' },
+    ];
+    var tabsEl = $('ctrl-detail-tabs-bar');
+    if (tabsEl) {
+      tabsEl.innerHTML = tabs.map(function(t) {
+        return '<button class="ctrl-detail-tab' + (ctrlDetailTab === t.id ? ' active' : '') + '" onclick="ctrlSwitchDetailTab(\'' + t.id + '\')">' + t.label + '</button>';
+      }).join('');
+    }
   }
 
-  // Body
+  _lastDetailGwId = gw.id;
+  _lastDetailTab = ctrlDetailTab;
+
+  // P1-DOM: Skip body re-render on polling if same gw+tab (except overview which shows live data)
+  if (sameGw && sameTab && ctrlDetailTab !== 'overview') return;
+
   renderDetailBody();
 }
 
