@@ -6,6 +6,7 @@ CP6: All runtime-specific logic is delegated to AgentAdapter instances.
 import json
 import asyncio
 import logging
+import time
 
 from fastapi import APIRouter, Request
 from db import get_db, new_id, now_ts, row_to_dict, rows_to_list
@@ -18,6 +19,10 @@ log = logging.getLogger("gateways")
 # Agent states: idle, working, speaking, tool_calling, error
 AGENT_STATES = ("idle", "working", "speaking", "tool_calling", "error")
 
+# P1-1: Health check cache (25s TTL)
+_health_cache: dict = {}  # {gateway_id: {"data": {...}, "ts": float}}
+_HEALTH_CACHE_TTL = 25  # seconds — shorter than 30s polling interval
+
 
 def _adapter_for(gw):
     """Return the correct adapter for a gateway row."""
@@ -26,15 +31,28 @@ def _adapter_for(gw):
 
 
 async def _health_check_async(gw):
-    """Async health check via adapter. Returns legacy-compatible dict."""
+    """Async health check via adapter. Returns legacy-compatible dict.
+    Always populates _health_cache on success."""
     adapter = _adapter_for(gw)
     hs = await adapter.health(gw["url"], decrypt(gw["token"] or ""))
-    return {
+    result = {
         "online": hs.online,
         "version": hs.version,
         "agents": hs.agents,
         "state": hs.state,
     }
+    # P1-1: Store in cache
+    _health_cache[gw["id"]] = {"data": result, "ts": time.monotonic()}
+    return result
+
+
+async def _health_cached(gw):
+    """Return cached health if within TTL, otherwise do a live check."""
+    gw_id = gw["id"]
+    cached = _health_cache.get(gw_id)
+    if cached and (time.monotonic() - cached["ts"]) < _HEALTH_CACHE_TTL:
+        return cached["data"]
+    return await _health_check_async(gw)
 
 
 def _health_check(gw):
@@ -200,11 +218,11 @@ async def list_gateways():
             full = db.execute("SELECT * FROM gateways WHERE id=?", (row["id"],)).fetchone()
             full_rows.append(full)
 
-        # Parallel health checks with 3s timeout per gateway
+        # P1-1: Parallel health checks with cache (25s TTL) + 3s timeout
         async def _safe_health(gw):
             try:
                 async with asyncio.timeout(3):
-                    return await _health_check_async(gw)
+                    return await _health_cached(gw)
             except (asyncio.TimeoutError, Exception) as e:
                 log.debug("health check timeout/error for %s: %s", gw["name"], e)
                 return {"online": False, "version": None, "agents": [], "state": "error"}
@@ -403,12 +421,19 @@ async def get_gateway_agents(gateway_id: str):
 
 @router.get("/{gateway_id}/sessions")
 async def get_gateway_sessions(gateway_id: str):
-    """Get sessions list from a specific gateway via adapter."""
+    """Get sessions list from a specific gateway via adapter.
+    P1-3: Reuse health cache to avoid redundant calls."""
     db = get_db()
     try:
         gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
         if not gw:
             return {"ok": False, "error": "Gateway not found"}
+
+        # P1-3: If health cache has fresh data with state info, ensure gateway is online
+        cached = _health_cache.get(gateway_id)
+        if cached and (time.monotonic() - cached["ts"]) < _HEALTH_CACHE_TTL:
+            if not cached["data"].get("online"):
+                return {"ok": True, "data": {"note": "gateway offline (cached)", "status": "offline"}}
 
         adapter = _adapter_for(gw)
         sessions = await adapter.list_sessions(gw["url"], decrypt(gw["token"] or ""))

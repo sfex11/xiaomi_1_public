@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import AsyncIterator
@@ -313,22 +314,24 @@ class OpenClawAdapter(AgentAdapter):
     GATEWAY_FILES = ["IDENTITY.md", "SOUL.md", "AGENTS.md", "TOOLS.md", "USER.md"]
 
     async def list_files(self, url: str, token: str) -> list[dict]:
-        """Return list of known gateway config files with availability info."""
+        """Return list of known gateway config files with availability info.
+        P1-2: All file checks run in parallel via asyncio.gather."""
         base = url.rstrip("/")
-        files = []
+
+        async def _check_file(c: httpx.AsyncClient, fname: str) -> dict:
+            try:
+                r = await c.post(
+                    f"{base}/tools/invoke",
+                    json={"tool": "files_read", "action": "json", "args": {"path": fname}},
+                    headers=_headers(token),
+                )
+                return {"name": fname, "exists": r.status_code < 400}
+            except Exception:
+                return {"name": fname, "exists": False}
+
         async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
-            for fname in self.GATEWAY_FILES:
-                try:
-                    r = await c.post(
-                        f"{base}/tools/invoke",
-                        json={"tool": "files_read", "action": "json", "args": {"path": fname}},
-                        headers=_headers(token),
-                    )
-                    exists = r.status_code < 400
-                    files.append({"name": fname, "exists": exists})
-                except Exception:
-                    files.append({"name": fname, "exists": False})
-        return files
+            files = await asyncio.gather(*[_check_file(c, f) for f in self.GATEWAY_FILES])
+        return list(files)
 
     async def get_file(self, url: str, token: str, filename: str) -> dict:
         """Read a single file's content from the gateway."""
