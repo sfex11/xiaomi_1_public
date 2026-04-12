@@ -248,24 +248,65 @@ class OpenClawAdapter(AgentAdapter):
 
     # ── list_sessions ────────────────────────────────────────────────
 
-    async def list_sessions(self, url: str, token: str) -> list[dict]:
-        """Fetch sessions via POST /tools/invoke (OpenClaw has no /api/sessions)."""
+    async def list_sessions(self, url: str, token: str) -> list[dict] | dict:
+        """Fetch sessions: try GET /api/sessions first, fallback to POST /tools/invoke."""
         base = url.rstrip("/")
-        payload = {"tool": "sessions_list", "action": "json", "args": {}}
-        try:
-            async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+            # 1) Try GET /api/sessions (OpenClaw native endpoint)
+            try:
+                r = await c.get(f"{base}/api/sessions", headers=_headers(token))
+                if r.status_code < 400:
+                    data = r.json()
+                    if isinstance(data, list):
+                        return data
+                    if isinstance(data, dict):
+                        return data.get("sessions", data.get("data", data.get("result", [])))
+            except Exception:
+                pass
+
+            # 2) Fallback: POST /tools/invoke sessions_list
+            try:
+                payload = {"tool": "sessions_list", "action": "json", "args": {}}
                 r = await c.post(f"{base}/tools/invoke", json=payload, headers=_headers(token))
-                if r.status_code >= 400:
-                    return []
-                data = r.json()
-        except Exception:
-            return []
-        # Normalize response to list of session dicts
-        if isinstance(data, list):
-            return data
-        if isinstance(data, dict):
-            return data.get("data", data.get("sessions", data.get("result", [])))
-        return []
+                if r.status_code < 400:
+                    data = r.json()
+                    if isinstance(data, list):
+                        return data
+                    if isinstance(data, dict):
+                        return data.get("data", data.get("sessions", data.get("result", [])))
+            except Exception:
+                pass
+
+        # 3) Both failed
+        return {"sessions": [], "note": "sessions not available"}
+
+    # ── list_agents ──────────────────────────────────────────────────
+
+    async def list_agents(self, url: str, token: str) -> list[dict]:
+        """Extract agent info from /api/sessions and health check data."""
+        agents_map: dict[str, dict] = {}
+
+        # 1) Get agents from health check (/v1/models agent IDs)
+        hs = await self.health(url, token)
+        for agent_id in (hs.agents or []):
+            agents_map[agent_id] = {"id": agent_id, "source": "health"}
+
+        # 2) Get agents from sessions
+        sessions = await self.list_sessions(url, token)
+        session_list = sessions if isinstance(sessions, list) else []
+        for sess in session_list:
+            if not isinstance(sess, dict):
+                continue
+            # Try common fields for agent info
+            agent_id = sess.get("agent_id") or sess.get("agent") or sess.get("model", "")
+            if agent_id and agent_id not in agents_map:
+                agents_map[agent_id] = {"id": agent_id, "source": "session"}
+            # Enrich with session status
+            if agent_id and agent_id in agents_map:
+                agents_map[agent_id]["status"] = sess.get("status", "unknown")
+
+        return list(agents_map.values())
 
     # ── list_files / get_file ──────────────────────────────────────
 

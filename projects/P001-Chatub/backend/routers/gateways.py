@@ -193,17 +193,51 @@ async def list_gateways():
             "SELECT id, name, url, kind, capabilities, created_at, updated_at "
             "FROM gateways ORDER BY name"
         ).fetchall()
-        gateways = []
+
+        # Fetch full rows for health checks
+        full_rows = []
         for row in rows:
-            gw = dict(row)
             full = db.execute("SELECT * FROM gateways WHERE id=?", (row["id"],)).fetchone()
-            health = await _health_check_async(full)
+            full_rows.append(full)
+
+        # Parallel health checks with 3s timeout per gateway
+        async def _safe_health(gw):
+            try:
+                async with asyncio.timeout(3):
+                    return await _health_check_async(gw)
+            except (asyncio.TimeoutError, Exception) as e:
+                log.debug("health check timeout/error for %s: %s", gw["name"], e)
+                return {"online": False, "version": None, "agents": [], "state": "error"}
+
+        health_results = await asyncio.gather(*[_safe_health(fw) for fw in full_rows])
+
+        gateways = []
+        for row, health in zip(rows, health_results):
+            gw = dict(row)
             gw["health"] = health
+
             # Parse capabilities JSON
             try:
                 gw["capabilities"] = json.loads(gw.get("capabilities") or "{}")
             except (json.JSONDecodeError, TypeError):
                 gw["capabilities"] = {}
+
+            # Task 4: Auto-migrate empty capabilities from health check
+            if health.get("online") and (not gw["capabilities"] or gw["capabilities"] == {}):
+                adapter = _adapter_for(row)
+                try:
+                    probe = await adapter.probe(row["url"], decrypt(row["token"] or ""))
+                    if probe.capabilities:
+                        cap_json = json.dumps(probe.capabilities)
+                        db.execute(
+                            "UPDATE gateways SET capabilities=?, updated_at=? WHERE id=? AND (capabilities IS NULL OR capabilities='{}')",
+                            (cap_json, now_ts(), row["id"])
+                        )
+                        db.commit()
+                        gw["capabilities"] = probe.capabilities
+                except Exception:
+                    pass
+
             stats = db.execute(
                 "SELECT SUM(tokens_prompt) AS prompt_tokens, "
                 "SUM(tokens_completion) AS completion_tokens, "
@@ -356,8 +390,11 @@ async def get_gateway_agents(gateway_id: str):
             return {"ok": False, "error": "Gateway not found"}
 
         adapter = _adapter_for(gw)
-        models = await adapter.list_models(gw["url"], decrypt(gw["token"] or ""))
-        return {"ok": True, "data": {"data": models}}
+        if hasattr(adapter, 'list_agents'):
+            agents = await adapter.list_agents(gw["url"], decrypt(gw["token"] or ""))
+        else:
+            agents = await adapter.list_models(gw["url"], decrypt(gw["token"] or ""))
+        return {"ok": True, "data": {"agents": agents}}
     except Exception as e:
         return {"ok": False, "error": str(e)}
     finally:
