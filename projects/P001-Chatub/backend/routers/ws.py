@@ -201,7 +201,7 @@ async def ws_status(ws: WebSocket):
 # Response: {"id":"req-1","data":[...]}  or  {"id":"req-1","error":"..."}
 # ---------------------------------------------------------------------------
 
-_RPC_TIMEOUT = 10  # seconds
+_RPC_TIMEOUT = 15  # seconds (CP15: increased for sessions/files queries)
 
 # Method registry — each entry is an async callable(params) -> data
 _RPC_METHODS: Dict[str, object] = {}
@@ -249,8 +249,115 @@ def _register_rpc_methods():
         finally:
             db.close()
 
+    # CP15: Session/Files WebSocket RPC methods
+
+    async def sessions_list(params):
+        """Return sessions for a specific gateway via adapter."""
+        from adapters import create_adapter
+        gw_id = params.get("gateway_id")
+        if not gw_id:
+            return {"error": "gateway_id required"}
+        db = get_db()
+        try:
+            gw = db.execute("SELECT * FROM gateways WHERE id=?", (gw_id,)).fetchone()
+            if not gw:
+                return {"error": f"Gateway {gw_id} not found"}
+        finally:
+            db.close()
+        kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
+        adapter = create_adapter(kind or "openclaw")
+        sessions = await adapter.list_sessions(gw["url"], decrypt(gw["token"] or ""))
+        return sessions if isinstance(sessions, list) else sessions
+
+    async def sessions_get(params):
+        """Return specific session detail via adapter."""
+        from adapters import create_adapter
+        gw_id = params.get("gateway_id")
+        session_id = params.get("session_id")
+        if not gw_id:
+            return {"error": "gateway_id required"}
+        db = get_db()
+        try:
+            gw = db.execute("SELECT * FROM gateways WHERE id=?", (gw_id,)).fetchone()
+            if not gw:
+                return {"error": f"Gateway {gw_id} not found"}
+        finally:
+            db.close()
+        kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
+        adapter = create_adapter(kind or "openclaw")
+        # Use list_sessions as baseline (most adapters don't have get by id)
+        sessions = await adapter.list_sessions(gw["url"], decrypt(gw["token"] or ""))
+        if isinstance(sessions, list) and session_id:
+            for s in sessions:
+                if isinstance(s, dict) and s.get("id") == session_id:
+                    return s
+        return sessions
+
+    async def gateway_agents(params):
+        """Return agents for a specific gateway via adapter."""
+        from adapters import create_adapter
+        gw_id = params.get("gateway_id")
+        if not gw_id:
+            return {"error": "gateway_id required"}
+        db = get_db()
+        try:
+            gw = db.execute("SELECT * FROM gateways WHERE id=?", (gw_id,)).fetchone()
+            if not gw:
+                return {"error": f"Gateway {gw_id} not found"}
+        finally:
+            db.close()
+        kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
+        adapter = create_adapter(kind or "openclaw")
+        if hasattr(adapter, 'list_agents'):
+            return await adapter.list_agents(gw["url"], decrypt(gw["token"] or ""))
+        return await adapter.list_models(gw["url"], decrypt(gw["token"] or ""))
+
+    async def files_list(params):
+        """Return file list for a specific gateway via adapter."""
+        from adapters import create_adapter
+        gw_id = params.get("gateway_id")
+        if not gw_id:
+            return {"error": "gateway_id required"}
+        db = get_db()
+        try:
+            gw = db.execute("SELECT * FROM gateways WHERE id=?", (gw_id,)).fetchone()
+            if not gw:
+                return {"error": f"Gateway {gw_id} not found"}
+        finally:
+            db.close()
+        kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
+        adapter = create_adapter(kind or "openclaw")
+        if not hasattr(adapter, 'list_files'):
+            return []
+        return await adapter.list_files(gw["url"], decrypt(gw["token"] or ""))
+
+    async def files_get(params):
+        """Read a specific file from a gateway via adapter."""
+        from adapters import create_adapter
+        gw_id = params.get("gateway_id")
+        filename = params.get("filename")
+        if not gw_id or not filename:
+            return {"error": "gateway_id and filename required"}
+        db = get_db()
+        try:
+            gw = db.execute("SELECT * FROM gateways WHERE id=?", (gw_id,)).fetchone()
+            if not gw:
+                return {"error": f"Gateway {gw_id} not found"}
+        finally:
+            db.close()
+        kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
+        adapter = create_adapter(kind or "openclaw")
+        if not hasattr(adapter, 'get_file'):
+            return {"error": "File access not supported"}
+        return await adapter.get_file(gw["url"], decrypt(gw["token"] or ""), filename)
+
     _RPC_METHODS["agents.list"] = agents_list
     _RPC_METHODS["gateways.stats"] = gateways_stats
+    _RPC_METHODS["sessions.list"] = sessions_list
+    _RPC_METHODS["sessions.get"] = sessions_get
+    _RPC_METHODS["gateway.agents"] = gateway_agents
+    _RPC_METHODS["files.list"] = files_list
+    _RPC_METHODS["files.get"] = files_get
 
 
 _register_rpc_methods()
