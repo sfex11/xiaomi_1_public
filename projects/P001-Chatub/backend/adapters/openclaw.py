@@ -60,9 +60,11 @@ class OpenClawAdapter(AgentAdapter):
                 caps["chat"] = True
                 caps["streaming"] = True  # OpenClaw always supports SSE
 
-                # 2) /api/sessions — optional feature
+                # 2) /tools/invoke sessions_list — optional feature
                 try:
-                    sr = await c.get(f"{base}/api/sessions", headers=_headers(token))
+                    sr = await c.post(f"{base}/tools/invoke",
+                                     json={"tool": "sessions_list", "action": "json", "args": {}},
+                                     headers=_headers(token))
                     if sr.status_code < 400:
                         caps["sessions"] = True
                 except Exception:
@@ -118,7 +120,8 @@ class OpenClawAdapter(AgentAdapter):
 
     async def _classify_state(self, client: httpx.AsyncClient, base: str, token: str) -> str:
         try:
-            r = await client.get(f"{base}/api/sessions", headers=_headers(token))
+            payload = {"tool": "sessions_list", "action": "json", "args": {}}
+            r = await client.post(f"{base}/tools/invoke", json=payload, headers=_headers(token))
             if r.status_code >= 400:
                 return "idle"
             sessions = r.json()
@@ -246,17 +249,60 @@ class OpenClawAdapter(AgentAdapter):
     # ── list_sessions ────────────────────────────────────────────────
 
     async def list_sessions(self, url: str, token: str) -> list[dict]:
+        """Fetch sessions via POST /tools/invoke (OpenClaw has no /api/sessions)."""
         base = url.rstrip("/")
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
-            r = await c.get(f"{base}/api/sessions", headers=_headers(token))
-            if r.status_code >= 400:
-                return []
-            data = r.json()
+        payload = {"tool": "sessions_list", "action": "json", "args": {}}
+        try:
+            async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+                r = await c.post(f"{base}/tools/invoke", json=payload, headers=_headers(token))
+                if r.status_code >= 400:
+                    return []
+                data = r.json()
+        except Exception:
+            return []
+        # Normalize response to list of session dicts
         if isinstance(data, list):
             return data
         if isinstance(data, dict):
-            return data.get("data", data.get("sessions", []))
+            return data.get("data", data.get("sessions", data.get("result", [])))
         return []
+
+    # ── list_files / get_file ──────────────────────────────────────
+
+    GATEWAY_FILES = ["IDENTITY.md", "SOUL.md", "AGENTS.md", "TOOLS.md", "USER.md"]
+
+    async def list_files(self, url: str, token: str) -> list[dict]:
+        """Return list of known gateway config files with availability info."""
+        base = url.rstrip("/")
+        files = []
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+            for fname in self.GATEWAY_FILES:
+                try:
+                    r = await c.post(
+                        f"{base}/tools/invoke",
+                        json={"tool": "files_read", "action": "json", "args": {"path": fname}},
+                        headers=_headers(token),
+                    )
+                    exists = r.status_code < 400
+                    files.append({"name": fname, "exists": exists})
+                except Exception:
+                    files.append({"name": fname, "exists": False})
+        return files
+
+    async def get_file(self, url: str, token: str, filename: str) -> dict:
+        """Read a single file's content from the gateway."""
+        base = url.rstrip("/")
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+            r = await c.post(
+                f"{base}/tools/invoke",
+                json={"tool": "files_read", "action": "json", "args": {"path": filename}},
+                headers=_headers(token),
+            )
+            if r.status_code >= 400:
+                return {"name": filename, "content": None, "error": f"HTTP {r.status_code}"}
+            data = r.json()
+        content = data if isinstance(data, str) else data.get("content", data.get("result", str(data)))
+        return {"name": filename, "content": content}
 
     # ── get_capabilities ─────────────────────────────────────────────
 

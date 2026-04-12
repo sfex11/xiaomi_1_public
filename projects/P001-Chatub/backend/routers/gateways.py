@@ -384,6 +384,46 @@ async def get_gateway_sessions(gateway_id: str):
         db.close()
 
 
+@router.get("/{gateway_id}/files")
+async def get_gateway_files(gateway_id: str):
+    """List available config files from a gateway."""
+    db = get_db()
+    try:
+        gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
+        if not gw:
+            return {"ok": False, "error": "Gateway not found"}
+
+        adapter = _adapter_for(gw)
+        if not hasattr(adapter, 'list_files'):
+            return {"ok": True, "data": []}
+        files = await adapter.list_files(gw["url"], decrypt(gw["token"] or ""))
+        return {"ok": True, "data": files}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
+@router.get("/{gateway_id}/files/{filename}")
+async def get_gateway_file(gateway_id: str, filename: str):
+    """Read a specific config file from a gateway."""
+    db = get_db()
+    try:
+        gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
+        if not gw:
+            return {"ok": False, "error": "Gateway not found"}
+
+        adapter = _adapter_for(gw)
+        if not hasattr(adapter, 'get_file'):
+            return {"ok": False, "error": "File access not supported"}
+        result = await adapter.get_file(gw["url"], decrypt(gw["token"] or ""), filename)
+        return {"ok": True, "data": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
 @router.get("/{gateway_id}/history")
 async def get_gateway_history(gateway_id: str, limit: int = 20):
     """Get chat history from a specific gateway."""

@@ -868,8 +868,14 @@ a { color: var(--accent); text-decoration: none; }
 .ctrl-session-route { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
 /* -- Mobile responsive -- */
+.ctrl-mobile-toggle { display: none; }
 @media (max-width: 768px) {
-  .ctrl-side-panel { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  .ctrl-side-panel { display: none !important; }
+  .ctrl-side-panel.mobile-visible { display: flex !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--bg-primary); }
+  .ctrl-resize-handle { display: none !important; }
+  .ctrl-panel-toggle { display: none !important; }
+  .ctrl-mobile-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: transparent; color: var(--text-secondary); border: none; cursor: pointer; }
+  .ctrl-mobile-toggle:hover { background: var(--bg-tertiary); color: var(--text-primary); }
   .ctrl-topbar { flex-wrap: wrap; padding: 6px 10px; }
   .ctrl-topbar-stats { display: none; }
   .ctrl-topbar-right .ctrl-last-check { display: none; }
@@ -1597,6 +1603,7 @@ a { color: var(--accent); text-decoration: none; }
           <div class="ctrl-topbar-stats" id="ctrl-topbar-stats"></div>
         </div>
         <div class="ctrl-topbar-right">
+          <button class="ctrl-mobile-toggle" id="ctrl-mobile-toggle" onclick="ctrlMobileToggleSidePanel()">☰ Gateways</button>
           <span class="ctrl-last-check" id="ctrl-last-check"></span>
           <label class="ctrl-auto-poll">
             <input type="checkbox" id="ctrl-auto-poll-cb" checked> 30s
@@ -4883,6 +4890,21 @@ function ctrlToggleSidePanel() {
   }
 }
 
+// -- Mobile: toggle side panel overlay --
+function ctrlMobileToggleSidePanel() {
+  var panel = $('ctrl-side-panel');
+  var btn = $('ctrl-mobile-toggle');
+  if (!panel) return;
+  var visible = panel.classList.contains('mobile-visible');
+  if (visible) {
+    panel.classList.remove('mobile-visible');
+    if (btn) btn.textContent = '☰ Gateways';
+  } else {
+    panel.classList.add('mobile-visible');
+    if (btn) btn.textContent = '✕ 닫기';
+  }
+}
+
 // -- Select gateway -> show detail --
 function ctrlSelectGw(gwId) {
   var gw = ctrlGateways.find(function(g) { return g.id === gwId; });
@@ -4892,6 +4914,9 @@ function ctrlSelectGw(gwId) {
   } else {
     ctrlSelectedGw = gw || null;
     ctrlDetailTab = 'overview';
+    // On mobile, close side panel overlay after selection
+    var panel = $('ctrl-side-panel');
+    if (panel) { panel.classList.remove('mobile-visible'); var btn = $('ctrl-mobile-toggle'); if (btn) btn.textContent = '☰ Gateways'; }
   }
   renderSideList();
   renderDetailView();
@@ -4945,7 +4970,7 @@ function renderDetailView() {
   var tabs = [
     { id: 'overview', label: '개요' },
     { id: 'sessions', label: '세션' },
-    { id: 'agents', label: '에이전트' },
+    { id: 'files', label: '파일' },
     { id: 'chat', label: '채팅' },
   ];
   var tabsEl = $('ctrl-detail-tabs-bar');
@@ -4965,7 +4990,7 @@ function ctrlSwitchDetailTab(tab) {
   var tabsEl = $('ctrl-detail-tabs-bar');
   if (tabsEl) {
     tabsEl.querySelectorAll('.ctrl-detail-tab').forEach(function(btn) {
-      btn.classList.toggle('active', btn.textContent.trim() === { overview: '개요', sessions: '세션', agents: '에이전트', chat: '채팅' }[tab]);
+      btn.classList.toggle('active', btn.textContent.trim() === { overview: '개요', sessions: '세션', files: '파일', chat: '채팅' }[tab]);
     });
   }
   renderDetailBody();
@@ -4981,9 +5006,9 @@ function renderDetailBody() {
   } else if (ctrlDetailTab === 'sessions') {
     body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">로딩 중...</div>';
     loadDetailSessions(body, gw);
-  } else if (ctrlDetailTab === 'agents') {
+  } else if (ctrlDetailTab === 'files') {
     body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">로딩 중...</div>';
-    loadDetailAgents(body, gw);
+    loadDetailFiles(body, gw);
   } else if (ctrlDetailTab === 'chat') {
     renderDetailChat(body, gw);
   }
@@ -5021,7 +5046,7 @@ async function loadDetailSessions(body, gw) {
     var data = await resp.json();
     if (!data.ok) { body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">세션 조회 실패</div>'; return; }
     var note = data.data && data.data.note ? data.data.note : '응답됨';
-    var sessions = (data.data && data.data.sessions) || [];
+    var sessions = Array.isArray(data.data) ? data.data : ((data.data && data.data.sessions) || []);
     if (sessions.length === 0) {
       body.innerHTML = '<div class="ctrl-session-item" style="text-align:left;">' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
@@ -5044,25 +5069,52 @@ async function loadDetailSessions(body, gw) {
   }
 }
 
-async function loadDetailAgents(body, gw) {
+async function loadDetailFiles(body, gw) {
   try {
-    var resp = await fetch('/api/gateways/' + gw.id + '/agents');
+    var resp = await fetch('/api/gateways/' + gw.id + '/files');
     var data = await resp.json();
     if (!data.ok || !data.data || data.data.length === 0) {
-      body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">에이전트 정보 없음</div>';
+      body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">파일 정보 없음</div>';
       return;
     }
-    body.innerHTML = data.data.map(function(a) {
-      return '<div class="ctrl-session-item" style="display:flex;align-items:center;gap:10px;">' +
-        '<div class="ctrl-agent-avatar" style="width:36px;height:36px;font-size:18px;border-radius:8px;background:var(--accent);">' + (a.emoji || '🤖') + '</div>' +
+    body.innerHTML = data.data.map(function(f) {
+      var icon = f.exists ? '📄' : '⚫';
+      var statusCls = f.exists ? 'success' : 'default';
+      var statusText = f.exists ? '있음' : '없음';
+      return '<div class="ctrl-session-item" style="display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="ctrlViewFile(\'' + gw.id + '\',\'' + escapeHtml(f.name) + '\')">' +
+        '<div style="font-size:20px;">' + icon + '</div>' +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="font-size:13px;font-weight:600;">' + escapeHtml(a.name || a.id) + '</div>' +
-          '<div style="font-size:11px;color:var(--text-muted);font-family:monospace;">' + (a.id || '') + '</div>' +
+          '<div style="font-size:13px;font-weight:600;">' + escapeHtml(f.name) + '</div>' +
         '</div>' +
+        '<span class="ctrl-badge-sm ' + statusCls + '">' + statusText + '</span>' +
       '</div>';
     }).join('');
   } catch (e) {
-    body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">에이전트 조회 실패</div>';
+    body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">파일 조회 실패</div>';
+  }
+}
+
+async function ctrlViewFile(gwId, filename) {
+  var body = $('ctrl-detail-body');
+  if (!body) return;
+  body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">파일 로딩 중...</div>';
+  try {
+    var resp = await fetch('/api/gateways/' + gwId + '/files/' + encodeURIComponent(filename));
+    var data = await resp.json();
+    if (!data.ok || !data.data || data.data.content == null) {
+      body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">파일을 읽을 수 없습니다</div>' +
+        '<div style="text-align:center;margin-top:8px;"><button class="ctrl-topbar-btn ghost" onclick="ctrlSwitchDetailTab(\'files\')">← 목록으로</button></div>';
+      return;
+    }
+    body.innerHTML = '<div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<button class="ctrl-topbar-btn ghost" onclick="ctrlSwitchDetailTab(\'files\')" style="padding:4px 8px;">←</button>' +
+        '<span style="font-size:14px;font-weight:700;">📄 ' + escapeHtml(filename) + '</span>' +
+      '</div>' +
+    '</div>' +
+    '<pre style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;color:var(--text-secondary);max-height:calc(100vh - 300px);overflow-y:auto;">' + escapeHtml(data.data.content) + '</pre>';
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">파일 로딩 실패: ' + escapeHtml(e.message) + '</div>';
   }
 }
 
@@ -5134,14 +5186,44 @@ async function ctrlSendChat(gwId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ gateway_id: gwId, messages: [{ role: 'user', content: text }] })
     });
-    var data = await resp.json();
     var bubble = document.getElementById(streamId);
-    if (bubble) {
-      var contentEl = bubble.querySelector('.bubble-content');
-      if (data.ok && data.data) {
-        contentEl.textContent = data.data.content || data.data;
-      } else {
-        contentEl.innerHTML = '<span style="color:var(--danger);">응답 실패</span>';
+    var contentType = resp.headers.get('content-type') || '';
+    if (contentType.indexOf('text/event-stream') !== -1) {
+      // SSE streaming response — read chunks
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var fullContent = '';
+      if (bubble) bubble.querySelector('.bubble-content').textContent = '';
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        var lines = decoder.decode(chunk.value, { stream: true }).split('\n');
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li].trim();
+          if (!line.startsWith('data:')) continue;
+          var dataStr = line.slice(5).trim();
+          if (dataStr === '[DONE]') continue;
+          try {
+            var parsed = JSON.parse(dataStr);
+            var delta = ((parsed.choices || [])[0] || {}).delta || {};
+            if (delta.content) {
+              fullContent += delta.content;
+              if (bubble) bubble.querySelector('.bubble-content').textContent = fullContent;
+            }
+          } catch (_) {}
+        }
+      }
+      if (bubble && !fullContent) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--text-muted);">(빈 응답)</span>';
+    } else {
+      // JSON response
+      var data = await resp.json();
+      if (bubble) {
+        var contentEl = bubble.querySelector('.bubble-content');
+        if (data.ok && data.data) {
+          contentEl.textContent = data.data.content || data.data;
+        } else {
+          contentEl.innerHTML = '<span style="color:var(--danger);">응답 실패</span>';
+        }
       }
     }
   } catch (e) {
