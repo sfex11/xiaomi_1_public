@@ -32,14 +32,22 @@ def _adapter_for(gw):
 
 async def _health_check_async(gw):
     """Async health check via adapter. Returns legacy-compatible dict.
-    Always populates _health_cache on success."""
+    Always populates _health_cache on success.
+    CP13: includes pairing_status (connected/pairing-required/error/disconnected)."""
     adapter = _adapter_for(gw)
-    hs = await adapter.health(gw["url"], decrypt(gw["token"] or ""))
+    url = gw["url"]
+    token = decrypt(gw["token"] or "")
+    hs = await adapter.health(url, token)
+
+    # CP13: 4-level pairing status
+    pairing_status = await adapter.get_pairing_status(url, token)
+
     result = {
         "online": hs.online,
         "version": hs.version,
         "agents": hs.agents,
         "state": hs.state,
+        "pairing_status": pairing_status,
     }
     # P1-1: Store in cache
     _health_cache[gw["id"]] = {"data": result, "ts": time.monotonic()}

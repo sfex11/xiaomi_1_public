@@ -353,3 +353,29 @@ class OpenClawAdapter(AgentAdapter):
     async def get_capabilities(self, url: str, token: str) -> dict[str, bool]:
         probe = await self.probe(url, token)
         return probe.capabilities
+
+    # ── CP13: 4-level pairing status ────────────────────────────────
+
+    async def get_pairing_status(self, url: str, token: str) -> str:
+        """HTTP status code 기반 4단계 페어링 상태 분류.
+
+        connected        — 2xx (health OK)
+        pairing-required — 401/403 (토큰 없음 또는 인증 실패)
+        error            — 5xx (서버 오류)
+        disconnected     — 타임아웃/연결 불가
+        """
+        base = url.rstrip("/")
+        try:
+            async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+                r = await c.get(f"{base}/v1/models", headers=_headers(token))
+                if r.status_code < 300:
+                    return "connected"
+                if r.status_code in (401, 403):
+                    return "pairing-required"
+                if r.status_code >= 500:
+                    return "error"
+                return "error"
+        except httpx.TimeoutException:
+            return "disconnected"
+        except Exception:
+            return "disconnected"

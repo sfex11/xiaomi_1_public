@@ -96,6 +96,28 @@ class AgentAdapter(ABC):
     async def get_capabilities(self, url: str, token: str) -> dict[str, bool]:
         """Return detected capability flags."""
 
+    async def get_pairing_status(self, url: str, token: str) -> str:
+        """Return 4-level pairing status based on HTTP probe.
+
+        Returns one of:
+            connected        — health OK (2xx)
+            pairing-required — no token or auth failed (401/403)
+            error            — server error (5xx)
+            disconnected     — timeout / connection refused
+        """
+        try:
+            probe = await self.probe(url, token)
+            if probe.reachable:
+                return "connected"
+            err = (probe.error or "").upper()
+            if "AUTH" in err or "401" in err or "403" in err:
+                return "pairing-required"
+            if "TIMEOUT" in err:
+                return "disconnected"
+            return "error"
+        except Exception:
+            return "disconnected"
+
 
 # ---------------------------------------------------------------------------
 # Registry + factory
