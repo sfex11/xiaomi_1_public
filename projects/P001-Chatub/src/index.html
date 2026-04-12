@@ -594,6 +594,96 @@ a { color: var(--accent); text-decoration: none; }
 .ctrl-session-route { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 .ctrl-session-time { font-size: 10px; color: var(--text-muted); float: right; }
 
+/* ===== Control Tower v2: Latency / Status / Summary / Detail / Resize ===== */
+.ctrl-latency {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 600; padding: 1px 6px;
+  border-radius: 8px; margin-left: 6px; white-space: nowrap;
+}
+.ctrl-latency.green { background: rgba(34,197,94,0.15); color: var(--success); }
+.ctrl-latency.yellow { background: rgba(245,158,11,0.15); color: var(--warning); }
+.ctrl-latency.red { background: rgba(239,68,68,0.15); color: var(--danger); }
+
+.ctrl-agent-status .dot.pairing { background: var(--warning); animation: pulse-dot 1.5s infinite; }
+.ctrl-agent-status .dot.disconnected { background: var(--text-muted); opacity: 0.5; }
+
+.ctrl-agent-card.selected {
+  border-color: var(--accent); background: var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.ctrl-status-summary {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+  border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.ctrl-status-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px;
+}
+.ctrl-status-badge .dot-sm {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+}
+.ctrl-status-badge.st-online { background: rgba(34,197,94,0.12); color: var(--success); }
+.ctrl-status-badge.st-online .dot-sm { background: var(--success); }
+.ctrl-status-badge.st-pairing { background: rgba(245,158,11,0.12); color: var(--warning); }
+.ctrl-status-badge.st-pairing .dot-sm { background: var(--warning); }
+.ctrl-status-badge.st-error { background: rgba(239,68,68,0.12); color: var(--danger); }
+.ctrl-status-badge.st-error .dot-sm { background: var(--danger); }
+.ctrl-status-badge.st-disconnected { background: var(--bg-tertiary); color: var(--text-muted); }
+.ctrl-status-badge.st-disconnected .dot-sm { background: var(--text-muted); }
+
+.ctrl-detail-panel {
+  border-top: 1px solid var(--border); background: var(--bg-secondary);
+  overflow: hidden; transition: max-height 0.3s ease;
+}
+.ctrl-detail-panel.collapsed { max-height: 0; border-top: none; }
+.ctrl-detail-panel.expanded { max-height: 600px; }
+.ctrl-detail-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+.ctrl-detail-header h4 { font-size: 14px; font-weight: 700; margin: 0; }
+.ctrl-detail-close {
+  width: 28px; height: 28px; border-radius: 6px; display: flex;
+  align-items: center; justify-content: center; font-size: 16px;
+  color: var(--text-muted); transition: all var(--transition);
+}
+.ctrl-detail-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+.ctrl-detail-tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+}
+.ctrl-detail-tab {
+  padding: 8px 16px; font-size: 11px; font-weight: 600;
+  color: var(--text-secondary); border-bottom: 2px solid transparent;
+  transition: all var(--transition); cursor: pointer;
+}
+.ctrl-detail-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+.ctrl-detail-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.ctrl-detail-body { padding: 16px; overflow-y: auto; max-height: 400px; }
+.ctrl-detail-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; font-size: 12px; border-bottom: 1px solid var(--border);
+}
+.ctrl-detail-row:last-child { border-bottom: none; }
+.ctrl-detail-row .label { color: var(--text-secondary); }
+.ctrl-detail-row .value { font-weight: 600; }
+
+.ctrl-resize-handle {
+  width: 5px; cursor: col-resize; background: transparent;
+  transition: background var(--transition); flex-shrink: 0; position: relative;
+}
+.ctrl-resize-handle::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); width: 3px; height: 32px;
+  border-radius: 2px; background: var(--border-strong); transition: background var(--transition);
+}
+.ctrl-resize-handle:hover::after, .ctrl-resize-handle.dragging::after {
+  background: var(--accent); width: 3px;
+}
+.ctrl-resize-handle:hover, .ctrl-resize-handle.dragging {
+  background: var(--accent-dim);
+}
+
 /* ===== Thread Panel ===== */
 .thread-panel { display: flex; flex-direction: column; height: 100%; }
 .thread-original {
@@ -1308,11 +1398,15 @@ a { color: var(--accent); text-decoration: none; }
       <div style="display:flex;height:100%;">
         <!-- Control Main: Agent Monitor + Activity -->
         <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <!-- Status Summary Bar -->
+          <div class="ctrl-status-summary" id="ctrl-status-summary"></div>
           <!-- Agent Status Cards -->
           <div style="padding:16px;border-bottom:1px solid var(--border);overflow-x:auto;">
             <div style="display:flex;gap:12px;min-width:max-content;align-items:center;" id="agent-status-cards"></div>
             <button onclick="openWizardModal()" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ 에이전트 추가</button>
           </div>
+          <!-- Agent Detail Panel -->
+          <div id="ctrl-detail-panel" class="ctrl-detail-panel collapsed"></div>
           <!-- Connection Wizard Modal -->
           <div id="wizard-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
             <div id="wizard-modal" style="background:var(--bg-primary);border-radius:16px;width:420px;max-width:90vw;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
@@ -1355,8 +1449,9 @@ a { color: var(--accent); text-decoration: none; }
             <div style="flex:1;overflow-y:auto;padding:16px;" id="ctrl-tab-content"></div>
           </div>
         </div>
-        <!-- Control Right: Stats -->
-        <div style="width:280px;border-left:1px solid var(--border);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;">
+        <!-- Control Right: Resize Handle + Stats -->
+        <div class="ctrl-resize-handle" id="ctrl-resize-handle"></div>
+        <div id="ctrl-right-panel" style="width:280px;border-left:1px solid var(--border);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;">
           <div>
             <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🎯 오늘 토큰</div>
             <div id="ctrl-token-stats"></div>
@@ -4403,10 +4498,40 @@ const AGENT_META = {
   xiaomi:  { emoji: '🤖', role: 'Backend', color: 'var(--agent-xiaomi)' },
 };
 
+let ctrlSelectedGw = null;    // Currently selected gateway for detail panel
+let ctrlDetailTab = 'overview'; // Detail panel active tab
+
 function renderControlTower() {
   fetchGateways();
   renderWeeklyChart();
   renderAchievements();
+}
+
+// Derive 4-level status from gateway health
+function getGwStatus(gw) {
+  if (!gw.health) return 'disconnected';
+  const hs = (gw.health.status || '').toLowerCase();
+  if (hs === 'connected' || hs === 'online' || gw.health.online === true) return 'online';
+  if (hs === 'pairing-required' || hs === 'pairing') return 'pairing';
+  if (hs === 'error') return 'error';
+  if (hs === 'disconnected' || hs === 'offline') return 'disconnected';
+  // fallback: use legacy online boolean
+  return gw.health.online ? 'online' : 'disconnected';
+}
+
+function getGwStatusText(status) {
+  return { online: '연결됨', pairing: '페어링 필요', error: '오류', disconnected: '오프라인' }[status] || '알 수 없음';
+}
+
+function getGwStatusDotClass(status) {
+  return { online: 'online', pairing: 'pairing', error: 'error', disconnected: 'disconnected' }[status] || 'offline';
+}
+
+function renderLatencyBadge(gw) {
+  const ms = gw.health && gw.health.latencyMs;
+  if (ms == null || ms === undefined) return '';
+  const cls = ms < 100 ? 'green' : ms < 500 ? 'yellow' : 'red';
+  return `<span class="ctrl-latency ${cls}">⏱ ${ms}ms</span>`;
 }
 
 async function fetchGateways() {
@@ -4415,7 +4540,10 @@ async function fetchGateways() {
     const data = await resp.json();
     if (data.ok) {
       ctrlGateways = data.data || [];
-      renderControlTower();
+      renderStatusSummary();
+      renderAgentCards();
+      renderTokenStats();
+      renderCtrlTab();
     }
   } catch (e) {
     console.error('[ControlTower] Failed to fetch gateways:', e);
@@ -4449,15 +4577,17 @@ function renderAgentCards() {
   }
   c.innerHTML = ctrlGateways.map(gw => {
     const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: '', color: 'var(--accent)' };
-    const online = gw.health && gw.health.online;
-    const status = online ? 'online' : 'offline';
-    const statusText = online ? '연결됨' : '오프라인';
+    const status = getGwStatus(gw);
+    const statusText = getGwStatusText(status);
+    const dotClass = getGwStatusDotClass(status);
+    const latency = renderLatencyBadge(gw);
+    const selected = ctrlSelectedGw && ctrlSelectedGw.id === gw.id ? ' selected' : '';
     return `
-    <div class="ctrl-agent-card" onclick="ctrlHealthCheck('${gw.id}')">
+    <div class="ctrl-agent-card${selected}" onclick="ctrlSelectAgent('${gw.id}')" ondblclick="ctrlHealthCheck('${gw.id}')">
       <div class="ctrl-agent-avatar" style="background:${meta.color}">${meta.emoji}</div>
       <div class="ctrl-agent-info">
-        <div class="ctrl-agent-name">${escapeHtml(gw.name)} <span style="font-size:10px;color:var(--text-muted);font-weight:400;">${meta.role || 'Agent'}</span></div>
-        <div class="ctrl-agent-status"><span class="dot ${status}"></span>${statusText}<span style="margin-left:6px;font-size:10px;color:var(--text-muted);">${gw.url}</span></div>
+        <div class="ctrl-agent-name">${escapeHtml(gw.name)} <span style="font-size:10px;color:var(--text-muted);font-weight:400;">${meta.role || 'Agent'}</span>${latency}</div>
+        <div class="ctrl-agent-status"><span class="dot ${dotClass}"></span>${statusText}<span style="margin-left:6px;font-size:10px;color:var(--text-muted);">${gw.url}</span></div>
         <div class="ctrl-cap-row">${renderCapBadges(gw)}</div>
       </div>
     </div>`;
@@ -4614,6 +4744,210 @@ function renderAchievements() {
     { icon: '🤝', title: '3에이전트', desc: '협업 시작' },
   ].map(a => `<div class="ctrl-badge" title="${a.desc}">${a.icon} ${a.title}</div>`).join('');
 }
+
+// ---- Status Summary Bar ----
+function renderStatusSummary() {
+  const el = $('ctrl-status-summary');
+  if (!el) return;
+  const counts = { online: 0, pairing: 0, error: 0, disconnected: 0 };
+  ctrlGateways.forEach(gw => { const s = getGwStatus(gw); if (counts[s] !== undefined) counts[s]++; });
+  const badges = [];
+  if (counts.online)       badges.push(`<span class="ctrl-status-badge st-online"><span class="dot-sm"></span>${counts.online} online</span>`);
+  if (counts.pairing)      badges.push(`<span class="ctrl-status-badge st-pairing"><span class="dot-sm"></span>${counts.pairing} pairing</span>`);
+  if (counts.error)        badges.push(`<span class="ctrl-status-badge st-error"><span class="dot-sm"></span>${counts.error} error</span>`);
+  if (counts.disconnected) badges.push(`<span class="ctrl-status-badge st-disconnected"><span class="dot-sm"></span>${counts.disconnected} offline</span>`);
+  el.innerHTML = badges.length ? badges.join('') + `<span style="margin-left:auto;font-size:10px;color:var(--text-muted);">총 ${ctrlGateways.length}개 에이전트</span>` : '';
+}
+
+// ---- Agent Detail Panel ----
+function ctrlSelectAgent(gwId) {
+  const gw = ctrlGateways.find(g => g.id === gwId);
+  if (ctrlSelectedGw && ctrlSelectedGw.id === gwId) {
+    ctrlSelectedGw = null;
+    collapseDetailPanel();
+  } else {
+    ctrlSelectedGw = gw || null;
+    expandDetailPanel();
+  }
+  renderAgentCards();
+  renderDetailPanel();
+}
+
+function expandDetailPanel() {
+  const p = $('ctrl-detail-panel');
+  p.classList.remove('collapsed');
+  p.classList.add('expanded');
+}
+
+function collapseDetailPanel() {
+  const p = $('ctrl-detail-panel');
+  p.classList.remove('expanded');
+  p.classList.add('collapsed');
+}
+
+function switchDetailTab(tab) {
+  ctrlDetailTab = tab;
+  renderDetailPanel();
+}
+
+function renderDetailPanel() {
+  const panel = $('ctrl-detail-panel');
+  if (!ctrlSelectedGw) { panel.innerHTML = ''; return; }
+  const gw = ctrlSelectedGw;
+  const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: 'Agent', color: 'var(--accent)' };
+  const status = getGwStatus(gw);
+  const statusText = getGwStatusText(status);
+  const dotCls = getGwStatusDotClass(status);
+  const latencyMs = gw.health && gw.health.latencyMs;
+  const tabs = ['overview', 'sessions', 'chat'];
+  const tabLabels = { overview: '📋 개요', sessions: '💻 세션', chat: '💬 채팅' };
+
+  let body = '';
+  const dotColors = { online: 'var(--success)', pairing: 'var(--warning)', error: 'var(--danger)', disconnected: 'var(--text-muted)' };
+  const latencyColor = latencyMs != null ? (latencyMs < 100 ? 'var(--success)' : latencyMs < 500 ? 'var(--warning)' : 'var(--danger)') : '';
+  if (ctrlDetailTab === 'overview') {
+    body = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:10px;text-align:center;">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">상태</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
+            <span style="width:8px;height:8px;display:inline-block;border-radius:50%;background:${dotColors[status] || 'var(--text-muted)'};"></span>
+            <span style="font-size:12px;font-weight:700;">${statusText}</span>
+          </div>
+        </div>
+        <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:10px;text-align:center;">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">레이턴시</div>
+          <div style="font-size:12px;font-weight:700;${latencyColor ? 'color:' + latencyColor : ''}">${latencyMs != null ? latencyMs + 'ms' : '—'}</div>
+        </div>
+        <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:10px;text-align:center;">
+          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">역할</div>
+          <div style="font-size:12px;font-weight:700;">${meta.role || 'Agent'}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="ctrl-detail-row"><span class="label">ID</span><span class="value" style="font-size:11px;color:var(--text-muted);">${gw.id}</span></div>
+        <div class="ctrl-detail-row"><span class="label">URL</span><span class="value" style="font-size:11px;">${escapeHtml(gw.url)}</span></div>
+        <div class="ctrl-detail-row"><span class="label">기능</span><span class="value">${renderCapBadges(gw)}</span></div>
+      </div>`;
+  } else if (ctrlDetailTab === 'sessions') {
+    body = `<div id="ctrl-detail-sessions" style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px;">로딩 중...</div>`;
+    setTimeout(() => loadDetailSessions(gw), 0);
+  } else if (ctrlDetailTab === 'chat') {
+    body = `<div id="ctrl-detail-chat" style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px;">로딩 중...</div>`;
+    setTimeout(() => loadDetailChat(gw), 0);
+  }
+
+  panel.innerHTML = `
+    <div class="ctrl-detail-header">
+      <h4>${meta.emoji} ${escapeHtml(gw.name)} <span style="font-size:11px;font-weight:400;color:var(--text-secondary);">${meta.role || 'Agent'}</span></h4>
+      <button class="ctrl-detail-close" onclick="ctrlSelectAgent('${gw.id}')" title="닫기">✕</button>
+    </div>
+    <div class="ctrl-detail-tabs">
+      ${tabs.map(t => `<button class="ctrl-detail-tab${ctrlDetailTab === t ? ' active' : ''}" onclick="switchDetailTab('${t}')">${tabLabels[t]}</button>`).join('')}
+    </div>
+    <div class="ctrl-detail-body">${body}</div>`;
+}
+
+async function loadDetailSessions(gw) {
+  const el = $('ctrl-detail-sessions');
+  if (!el) return;
+  try {
+    const resp = await fetch(`/api/gateways/${gw.id}/sessions`);
+    const data = await resp.json();
+    const note = data.data && data.data.note ? data.data.note : (data.ok ? '응답됨' : '실패');
+    el.innerHTML = `<div class="ctrl-session-item" style="text-align:left;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="font-size:13px;font-weight:600;">${escapeHtml(gw.name)}</div>
+        <span style="margin-left:auto;font-size:11px;color:${data.ok ? 'var(--success)' : 'var(--danger)'};">${escapeHtml(note)}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${escapeHtml(gw.url)}</div>
+    </div>`;
+  } catch (e) {
+    el.innerHTML = '<div style="color:var(--danger);font-size:12px;">세션 조회 실패</div>';
+  }
+}
+
+async function loadDetailChat(gw) {
+  const el = $('ctrl-detail-chat');
+  if (!el) return;
+  try {
+    const resp = await fetch(`/api/gateways/chat-logs?gateway_id=${gw.id}&limit=20`);
+    const data = await resp.json();
+    if (!data.ok || !data.data || data.data.length === 0) {
+      el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">채팅 기록이 없습니다</div>';
+      return;
+    }
+    el.innerHTML = data.data.map(l => {
+      const isUser = l.role === 'user';
+      const time = new Date(l.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--border);text-align:left;">
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+          <span style="font-size:11px;font-weight:600;color:${isUser ? 'var(--accent)' : 'var(--success)'};">${isUser ? '요청' : '응답'}</span>
+          <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${time}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-primary);">${escapeHtml(l.content)}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<div style="color:var(--danger);font-size:12px;">채팅 로그 조회 실패</div>';
+  }
+}
+
+// ---- Right Panel Resize Handle ----
+(function initCtrlResize() {
+  const handle = $('ctrl-resize-handle');
+  const panel = $('ctrl-right-panel');
+  if (!handle || !panel) return;
+  const MIN_W = 200, MAX_W = 500;
+  let dragging = false, startX = 0, startW = 0;
+
+  handle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    dragging = true;
+    startX = e.clientX;
+    startW = panel.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    const diff = startX - e.clientX;
+    const newW = Math.min(MAX_W, Math.max(MIN_W, startW + diff));
+    panel.style.width = newW + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+
+  // Touch support
+  handle.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    dragging = true;
+    startX = e.touches[0].clientX;
+    startW = panel.offsetWidth;
+    handle.classList.add('dragging');
+  }, { passive: false });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!dragging) return;
+    const diff = startX - e.touches[0].clientX;
+    const newW = Math.min(MAX_W, Math.max(MIN_W, startW + diff));
+    panel.style.width = newW + 'px';
+  });
+
+  document.addEventListener('touchend', function() {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+  });
+})();
 
 // ---- Agent Select Bar & Broadcast ----
 let selectedGatewayId = null;
