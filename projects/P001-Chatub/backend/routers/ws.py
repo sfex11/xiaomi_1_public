@@ -371,6 +371,76 @@ def _save_chat_log(gw_id: str, gw_name: str, messages: list,
         log.warning("chat log save failed for %s: %s", gw_id, e)
 
 
+@router.websocket("/ws/chat/{gateway_id}")
+async def ws_chat_gateway(gateway_id: str, ws: WebSocket):
+    """CP14: Per-gateway streaming chat WebSocket.
+
+    Client sends:  {"messages":[{"role":"user","content":"..."}]}
+    Server pushes:
+      {"type":"chat.chunk","gateway_id":"xxx","content":"..."}
+      {"type":"chat.done","gateway_id":"xxx","full":"전체응답"}
+      {"type":"chat.error","gateway_id":"xxx","error":"..."}
+    """
+    await ws.accept()
+    try:
+        while True:
+            raw = await ws.receive_text()
+            try:
+                msg = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                await ws.send_text(json.dumps(
+                    {"type": "chat.error", "gateway_id": gateway_id, "error": "invalid JSON"},
+                    ensure_ascii=False))
+                continue
+
+            messages = msg.get("messages", [])
+            if not messages:
+                await ws.send_text(json.dumps(
+                    {"type": "chat.error", "gateway_id": gateway_id, "error": "messages required"},
+                    ensure_ascii=False))
+                continue
+
+            db = get_db()
+            try:
+                row = db.execute(
+                    "SELECT id, name, url, token, kind FROM gateways WHERE id=?",
+                    (gateway_id,)).fetchone()
+                if not row:
+                    await ws.send_text(json.dumps(
+                        {"type": "chat.error", "gateway_id": gateway_id,
+                         "error": f"Gateway {gateway_id} not found"},
+                        ensure_ascii=False))
+                    continue
+            finally:
+                db.close()
+
+            gid, gname = row["id"], row["name"]
+            kind = row["kind"] if "kind" in row.keys() else "openclaw"
+            payload = {k: v for k, v in msg.items() if k not in ("stream",)}
+
+            try:
+                result = await _stream_one_gateway(
+                    ws, gid, gname, row["url"], decrypt(row["token"] or ""),
+                    kind or "openclaw", payload)
+                _save_chat_log(gid, gname, messages,
+                               result[2], result[3], result[4])
+            except httpx.HTTPStatusError as e:
+                log.warning("stream to %s failed: HTTP %d", gname, e.response.status_code)
+                await ws.send_text(json.dumps({
+                    "type": "chat.error", "gateway_id": gid,
+                    "error": f"HTTP {e.response.status_code}",
+                }, ensure_ascii=False))
+            except Exception as e:
+                log.warning("stream to %s failed: %s", gname, e)
+                await ws.send_text(json.dumps({
+                    "type": "chat.error", "gateway_id": gid,
+                    "error": str(e),
+                }, ensure_ascii=False))
+
+    except WebSocketDisconnect:
+        pass
+
+
 @router.websocket("/ws/chat")
 async def ws_chat(ws: WebSocket):
     """Streaming chat relay: SSE → WebSocket.

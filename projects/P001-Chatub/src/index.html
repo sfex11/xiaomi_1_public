@@ -5162,6 +5162,17 @@ async function ctrlLoadChatHistory(gwId) {
   }
 }
 
+// CP14: WebSocket-based streaming chat (replaces SSE fetch)
+var _ctrlChatWs = {};  // {gwId: WebSocket}
+
+function _getOrCreateChatWs(gwId) {
+  if (_ctrlChatWs[gwId] && _ctrlChatWs[gwId].readyState <= 1) return _ctrlChatWs[gwId];
+  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  var ws = new WebSocket(proto + '//' + location.host + '/ws/chat/' + gwId);
+  _ctrlChatWs[gwId] = ws;
+  return ws;
+}
+
 async function ctrlSendChat(gwId) {
   var input = $('ctrl-chat-input');
   var text = input ? input.value.trim() : '';
@@ -5180,61 +5191,59 @@ async function ctrlSendChat(gwId) {
   msgs.innerHTML += '<div class="ctrl-chat-bubble agent" id="' + streamId + '"><div><div class="bubble-name">' + meta.emoji + ' ' + escapeHtml(gw ? gw.name : 'Agent') + '</div><div class="bubble-content"><span class="streaming-cursor"></span></div></div></div>';
   msgs.scrollTop = msgs.scrollHeight;
 
-  try {
-    var resp = await fetch('/api/gateway-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gateway_id: gwId, messages: [{ role: 'user', content: text }] })
-    });
-    var bubble = document.getElementById(streamId);
-    var contentType = resp.headers.get('content-type') || '';
-    if (contentType.indexOf('text/event-stream') !== -1) {
-      // SSE streaming response — read chunks
-      var reader = resp.body.getReader();
-      var decoder = new TextDecoder();
-      var fullContent = '';
-      if (bubble) bubble.querySelector('.bubble-content').textContent = '';
-      while (true) {
-        var chunk = await reader.read();
-        if (chunk.done) break;
-        var lines = decoder.decode(chunk.value, { stream: true }).split('\n');
-        for (var li = 0; li < lines.length; li++) {
-          var line = lines[li].trim();
-          if (!line.startsWith('data:')) continue;
-          var dataStr = line.slice(5).trim();
-          if (dataStr === '[DONE]') continue;
-          try {
-            var parsed = JSON.parse(dataStr);
-            var delta = ((parsed.choices || [])[0] || {}).delta || {};
-            if (delta.content) {
-              fullContent += delta.content;
-              if (bubble) bubble.querySelector('.bubble-content').textContent = fullContent;
-            }
-          } catch (_) {}
-        }
-      }
-      if (bubble && !fullContent) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--text-muted);">(빈 응답)</span>';
-    } else {
-      // JSON response
-      var data = await resp.json();
-      if (bubble) {
-        var contentEl = bubble.querySelector('.bubble-content');
-        if (data.ok && data.data) {
-          contentEl.textContent = data.data.content || data.data;
-        } else {
-          contentEl.innerHTML = '<span style="color:var(--danger);">응답 실패</span>';
-        }
-      }
-    }
-  } catch (e) {
-    var bubble = document.getElementById(streamId);
-    if (bubble) {
-      bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--danger);">전송 실패: ' + escapeHtml(e.message) + '</span>';
-    }
+  var ws = _getOrCreateChatWs(gwId);
+  var fullContent = '';
+
+  function _send() {
+    ws.send(JSON.stringify({ messages: [{ role: 'user', content: text }] }));
   }
-  input.disabled = false;
-  input.focus();
-  msgs.scrollTop = msgs.scrollHeight;
+
+  function _cleanup() {
+    ws.onmessage = null;
+    ws.onerror = null;
+    input.disabled = false;
+    input.focus();
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  ws.onmessage = function(ev) {
+    try {
+      var data = JSON.parse(ev.data);
+      var bubble = document.getElementById(streamId);
+      if (data.type === 'chat.chunk') {
+        fullContent += data.content;
+        if (bubble) bubble.querySelector('.bubble-content').textContent = fullContent;
+        msgs.scrollTop = msgs.scrollHeight;
+      } else if (data.type === 'chat.done') {
+        if (bubble) {
+          if (data.full) bubble.querySelector('.bubble-content').textContent = data.full;
+          else if (!fullContent) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--text-muted);">(빈 응답)</span>';
+        }
+        _cleanup();
+      } else if (data.type === 'chat.error') {
+        if (bubble) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--danger);">오류: ' + escapeHtml(data.error || '알 수 없음') + '</span>';
+        _cleanup();
+      }
+    } catch (_) {}
+  };
+
+  ws.onerror = function() {
+    var bubble = document.getElementById(streamId);
+    if (bubble) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--danger);">WebSocket 연결 실패</span>';
+    _cleanup();
+  };
+
+  if (ws.readyState === 1) {
+    _send();
+  } else if (ws.readyState === 0) {
+    ws.onopen = function() { _send(); };
+  } else {
+    // Reconnect
+    ws = _getOrCreateChatWs(gwId);
+    ws.onopen = function() { _send(); };
+    ws.onmessage = ws.onmessage;
+    ws.onerror = ws.onerror;
+  }
 }
 
 // -- Side Panel Resize Handle --
