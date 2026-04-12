@@ -511,51 +511,327 @@ a { color: var(--accent); text-decoration: none; }
 .panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .panel-content { flex: 1; overflow-y: auto; }
 
-/* ===== Control Tower (관제탑) ===== */
-.ctrl-agent-card {
-  min-width: 200px; padding: 14px; background: var(--bg-tertiary);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  display: flex; gap: 12px; align-items: center; cursor: pointer;
-  transition: all var(--transition);
+/* ===== Control Tower (관제탑) — v3 Two-Column Layout ===== */
+
+/* -- TopBar -- */
+.ctrl-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; background: rgba(0,0,0,0.35);
+  border-bottom: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; gap: 12px;
 }
-.ctrl-agent-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.ctrl-topbar-left { display: flex; align-items: center; gap: 10px; }
+.ctrl-topbar-left .ctrl-topbar-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.ctrl-topbar-left .ctrl-topbar-icon { font-size: 18px; }
+.ctrl-topbar-stats { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+.ctrl-stat-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  border: 1px solid;
+}
+.ctrl-stat-pill .dot-sm { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ctrl-stat-pill.st-online { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.2); color: var(--success); }
+.ctrl-stat-pill.st-pairing { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.2); color: var(--info); }
+.ctrl-stat-pill.st-error { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); color: var(--danger); }
+.ctrl-stat-pill.st-disconnected { background: var(--bg-tertiary); border-color: var(--border); color: var(--text-muted); }
+.ctrl-topbar-right { display: flex; align-items: center; gap: 6px; }
+.ctrl-topbar-right .ctrl-last-check { font-size: 10px; color: var(--text-muted); margin-right: 6px; }
+.ctrl-auto-poll {
+  display: flex; align-items: center; gap: 4px; padding: 3px 8px;
+  border-radius: 6px; background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1); font-size: 11px; color: var(--text-secondary); cursor: pointer;
+}
+.ctrl-auto-poll input[type="checkbox"] { accent-color: var(--accent); width: 12px; height: 12px; }
+.ctrl-topbar-btn {
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  transition: all 150ms ease; cursor: pointer;
+}
+.ctrl-topbar-btn.ghost { background: transparent; color: var(--text-secondary); border: none; }
+.ctrl-topbar-btn.ghost:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.ctrl-topbar-btn.primary { background: var(--accent); color: #fff; border: none; }
+.ctrl-topbar-btn.primary:hover { background: var(--accent-hover); }
+.ctrl-topbar-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 4px; }
+
+/* -- Side Panel (Gateway list) -- */
+.ctrl-side-panel {
+  display: flex; height: 100%; flex-shrink: 0;
+  width: 340px; min-width: 280px; max-width: 520px;
+}
+.ctrl-side-content {
+  display: flex; flex-direction: column; flex: 1;
+  background: var(--bg-primary); border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+.ctrl-side-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; color: var(--text-primary);
+}
+.ctrl-side-header .ctrl-gw-count { font-weight: 400; color: var(--text-muted); font-size: 11px; }
+.ctrl-side-list {
+  flex: 1; overflow-y: auto; padding: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+/* -- Gateway Card (in side panel) -- */
+.ctrl-gw-card {
+  padding: 12px; background: var(--bg-secondary);
+  border: 1px solid var(--border); border-radius: 8px;
+  cursor: pointer; transition: all 150ms ease;
+}
+.ctrl-gw-card:hover:not(.selected) {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.15);
+}
+.ctrl-gw-card.selected {
+  border-color: var(--accent); background: var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+.ctrl-gw-card.border-success { border-color: rgba(34,197,94,0.4); }
+.ctrl-gw-card.border-danger { border-color: rgba(239,68,68,0.4); }
+.ctrl-gw-card.border-info { border-color: rgba(59,130,246,0.4); }
+.ctrl-gw-card-head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+}
+.ctrl-gw-card-head .ctrl-gw-name {
+  font-size: 12px; font-weight: 700; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ctrl-gw-card-head .ctrl-gw-url {
+  font-size: 11px; color: var(--text-muted); font-family: monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px;
+}
+.ctrl-gw-metrics {
+  display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary); margin-top: 8px;
+  align-items: center;
+}
+.ctrl-gw-metrics span { display: flex; align-items: center; gap: 3px; }
+.ctrl-gw-agents-toggle {
+  margin-top: 8px; padding: 0; border: none; background: none;
+  font-size: 11px; color: var(--text-muted); cursor: pointer; font-family: inherit;
+  transition: color 150ms ease;
+}
+.ctrl-gw-agents-toggle:hover { color: var(--text-primary); }
+.ctrl-gw-agent-list { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.ctrl-gw-agent-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 8px; border-radius: 6px; background: var(--bg-tertiary);
+  font-size: 11px;
+}
+.ctrl-gw-agent-item .agent-id { margin-left: auto; font-family: monospace; font-size: 10px; color: var(--text-muted); }
+
+/* -- Drag Resize Handle -- */
+.ctrl-resize-handle {
+  width: 5px; cursor: col-resize; background: transparent;
+  transition: background 150ms ease; flex-shrink: 0; position: relative;
+}
+.ctrl-resize-handle::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); width: 3px; height: 32px;
+  border-radius: 2px; background: var(--border-strong); transition: background 150ms ease;
+}
+.ctrl-resize-handle:hover::after, .ctrl-resize-handle.dragging::after { background: var(--accent); }
+.ctrl-resize-handle:hover, .ctrl-resize-handle.dragging { background: var(--accent-dim); }
+
+/* -- Side Panel Collapse Toggle -- */
+.ctrl-panel-toggle {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-left: none; border-radius: 0 8px 8px 0; padding: 6px;
+  color: var(--text-muted); cursor: pointer; margin-top: 8px;
+  transition: all 150ms ease; font-size: 14px;
+}
+.ctrl-panel-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* -- Detail View (main area) -- */
+.ctrl-detail-view {
+  display: flex; flex-direction: column; flex: 1; overflow: hidden;
+  background: var(--bg-primary);
+}
+.ctrl-detail-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex: 1; color: var(--text-muted); gap: 8px;
+}
+.ctrl-detail-empty .empty-icon { font-size: 48px; opacity: 0.2; margin-bottom: 8px; }
+.ctrl-detail-empty .empty-title { font-size: 14px; color: var(--text-secondary); }
+.ctrl-detail-empty .empty-desc { font-size: 12px; }
+
+/* -- Detail Tabs -- */
+.ctrl-detail-tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+  background: var(--bg-primary); flex-shrink: 0;
+}
+.ctrl-detail-tab {
+  flex: 1; padding: 8px; font-size: 12px; font-weight: 600; text-align: center;
+  color: var(--text-muted); border: none; background: none; cursor: pointer;
+  transition: all 150ms ease; display: flex; align-items: center; justify-content: center; gap: 4px;
+  position: relative;
+}
+.ctrl-detail-tab:hover { color: var(--text-secondary); }
+.ctrl-detail-tab.active { color: var(--accent); font-weight: 700; }
+.ctrl-detail-tab.active::after {
+  content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+  height: 2px; background: var(--accent);
+}
+.ctrl-detail-tab .tab-count {
+  background: var(--accent-dim); color: var(--accent); font-size: 10px;
+  padding: 0 6px; border-radius: 99px; margin-left: 2px;
+}
+.ctrl-detail-body { flex: 1; overflow-y: auto; padding: 20px; }
+.ctrl-detail-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.ctrl-detail-header h4 { font-size: 14px; font-weight: 700; margin: 0; }
+.ctrl-detail-close {
+  width: 28px; height: 28px; border-radius: 6px; display: flex;
+  align-items: center; justify-content: center; font-size: 16px;
+  color: var(--text-muted); transition: all 150ms ease; cursor: pointer;
+}
+.ctrl-detail-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* -- Detail: Overview metrics grid -- */
+.ctrl-overview-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;
+}
+.ctrl-metric-card {
+  background: var(--bg-tertiary); border-radius: var(--radius-sm); padding: 12px; text-align: center;
+  border: 1px solid var(--border);
+}
+.ctrl-metric-label {
+  font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.8px; margin-bottom: 6px;
+}
+.ctrl-metric-value {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 13px; font-weight: 700; color: var(--text-primary);
+}
+.ctrl-detail-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; font-size: 12px; border-bottom: 1px solid var(--border);
+}
+.ctrl-detail-row:last-child { border-bottom: none; }
+.ctrl-detail-row .label { color: var(--text-secondary); }
+.ctrl-detail-row .value { font-weight: 600; }
+
+/* -- Detail: Split Panel (Sessions / Agents) -- */
+.ctrl-split-panel { display: flex; flex: 1; overflow: hidden; margin: -20px; }
+.ctrl-split-left {
+  width: 280px; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.ctrl-split-left-header {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;
+}
+.ctrl-split-left-list {
+  flex: 1; overflow-y: auto; padding: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ctrl-split-item {
+  padding: 8px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid transparent; transition: all 150ms ease; font-size: 12px;
+}
+.ctrl-split-item:hover { background: var(--bg-hover); }
+.ctrl-split-item.active { background: var(--accent-dim); border-color: var(--accent); }
+.ctrl-split-right { flex: 1; overflow-y: auto; padding: 16px; }
+
+/* -- Chat Interface -- */
+.ctrl-chat-container { display: flex; flex-direction: column; height: 100%; margin: -20px; }
+.ctrl-chat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.ctrl-chat-messages {
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ctrl-chat-bubble { display: flex; max-width: 85%; font-size: 13px; }
+.ctrl-chat-bubble.user { align-self: flex-end; }
+.ctrl-chat-bubble.agent { align-self: flex-start; }
+.ctrl-chat-bubble .bubble-name { font-size: 11px; font-weight: 600; color: var(--warning); margin-bottom: 3px; }
+.ctrl-chat-bubble .bubble-content {
+  padding: 10px 12px; border-radius: 8px; line-height: 1.5;
+}
+.ctrl-chat-bubble.user .bubble-content { background: var(--accent); color: #fff; }
+.ctrl-chat-bubble.agent .bubble-content { background: var(--bg-tertiary); color: var(--text-secondary); }
+.ctrl-chat-bubble .streaming-cursor {
+  display: inline-block; width: 6px; height: 14px; background: var(--warning);
+  margin-left: 3px; border-radius: 2px; animation: ctrl-pulse 1s infinite; vertical-align: text-bottom;
+}
+@keyframes ctrl-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.ctrl-chat-input {
+  padding: 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0;
+}
+.ctrl-chat-input input {
+  flex: 1; padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-primary); font-size: 13px;
+}
+.ctrl-chat-input input::placeholder { color: var(--text-muted); }
+.ctrl-chat-input input:focus { outline: none; border-color: transparent; box-shadow: 0 0 0 2px var(--accent); }
+.ctrl-chat-input button {
+  padding: 8px 16px; background: var(--accent); color: #fff; border: none;
+  border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background 150ms ease;
+}
+.ctrl-chat-input button:hover { background: var(--accent-hover); }
+.ctrl-chat-input button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* -- Badges (reusable) -- */
+.ctrl-badge-sm {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: 99px; font-weight: 600; font-size: 10px; white-space: nowrap;
+}
+.ctrl-badge-sm.success { background: rgba(34,197,94,0.15); color: var(--success); }
+.ctrl-badge-sm.danger { background: rgba(239,68,68,0.15); color: var(--danger); }
+.ctrl-badge-sm.info { background: rgba(59,130,246,0.15); color: var(--info); }
+.ctrl-badge-sm.warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+.ctrl-badge-sm.default { background: var(--bg-tertiary); color: var(--text-secondary); }
 
 .ctrl-cap-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 1.4;
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 600; line-height: 1.4;
 }
 .ctrl-cap-badge.on { background: rgba(52,199,89,0.15); color: var(--success); }
 .ctrl-cap-badge.off { background: var(--bg-secondary); color: var(--text-muted); opacity: 0.5; }
 .ctrl-cap-row { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
 
+/* -- Latency Badge -- */
+.ctrl-latency {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 600; padding: 1px 6px;
+  border-radius: 8px; white-space: nowrap;
+}
+.ctrl-latency.green { background: rgba(34,197,94,0.15); color: var(--success); }
+.ctrl-latency.yellow { background: rgba(245,158,11,0.15); color: var(--warning); }
+.ctrl-latency.red { background: rgba(239,68,68,0.15); color: var(--danger); }
+
+/* -- Toast Notification -- */
+.ctrl-toast-container {
+  position: fixed; top: 16px; right: 16px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.ctrl-toast {
+  padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  color: var(--text-primary); box-shadow: var(--shadow);
+  pointer-events: auto; animation: ctrl-toast-in 0.3s ease;
+}
+.ctrl-toast.success { border-color: rgba(34,197,94,0.3); }
+.ctrl-toast.error { border-color: rgba(239,68,68,0.3); }
+.ctrl-toast.info { border-color: rgba(59,130,246,0.3); }
+@keyframes ctrl-toast-in { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* -- Legacy compat (activity, tools, sessions, tokens, chart, badges) -- */
 .ctrl-agent-avatar {
   width: 44px; height: 44px; border-radius: 12px; display: flex;
   align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;
 }
-.ctrl-agent-info { flex: 1; min-width: 0; }
-.ctrl-agent-name { font-size: 13px; font-weight: 700; }
-.ctrl-agent-status { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-.ctrl-agent-status .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
-.ctrl-agent-status .dot.online { background: var(--success); box-shadow: 0 0 4px var(--success); }
-.ctrl-agent-status .dot.busy { background: var(--warning); animation: pulse-dot 1.5s infinite; }
-.ctrl-agent-status .dot.offline { background: var(--text-muted); }
-.ctrl-agent-status .dot.error { background: var(--danger); }
 .ctrl-activity-item {
-  display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border);
-  align-items: flex-start;
+  display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: flex-start;
 }
 .ctrl-activity-item:last-child { border-bottom: none; }
-.ctrl-activity-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
 .ctrl-activity-text { flex: 1; }
 .ctrl-activity-title { font-size: 13px; font-weight: 600; }
 .ctrl-activity-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
-.ctrl-activity-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
 .ctrl-tool-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 12px;
   background: var(--bg-tertiary); border-radius: var(--radius-sm); margin-bottom: 6px;
@@ -573,9 +849,7 @@ a { color: var(--accent); text-decoration: none; }
 .ctrl-token-value { font-weight: 700; }
 .ctrl-token-value.good { color: var(--success); }
 .ctrl-token-value.warn { color: var(--warning); }
-.ctrl-chart-bar {
-  display: flex; align-items: flex-end; gap: 4px; height: 80px; padding-top: 8px;
-}
+.ctrl-chart-bar { display: flex; align-items: flex-end; gap: 4px; height: 80px; padding-top: 8px; }
 .ctrl-chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .ctrl-chart-bar-inner {
   width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--accent), var(--agent-lenovo));
@@ -592,96 +866,16 @@ a { color: var(--accent); text-decoration: none; }
   border: 1px solid var(--border); margin-bottom: 8px;
 }
 .ctrl-session-route { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-.ctrl-session-time { font-size: 10px; color: var(--text-muted); float: right; }
 
-/* ===== Control Tower v2: Latency / Status / Summary / Detail / Resize ===== */
-.ctrl-latency {
-  display: inline-flex; align-items: center; gap: 3px;
-  font-size: 10px; font-weight: 600; padding: 1px 6px;
-  border-radius: 8px; margin-left: 6px; white-space: nowrap;
-}
-.ctrl-latency.green { background: rgba(34,197,94,0.15); color: var(--success); }
-.ctrl-latency.yellow { background: rgba(245,158,11,0.15); color: var(--warning); }
-.ctrl-latency.red { background: rgba(239,68,68,0.15); color: var(--danger); }
-
-.ctrl-agent-status .dot.pairing { background: var(--warning); animation: pulse-dot 1.5s infinite; }
-.ctrl-agent-status .dot.disconnected { background: var(--text-muted); opacity: 0.5; }
-
-.ctrl-agent-card.selected {
-  border-color: var(--accent); background: var(--accent-dim);
-  box-shadow: 0 0 0 2px var(--accent-glow);
-}
-
-.ctrl-status-summary {
-  display: flex; align-items: center; gap: 8px; padding: 8px 16px;
-  border-bottom: 1px solid var(--border); font-size: 12px;
-}
-.ctrl-status-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 11px;
-}
-.ctrl-status-badge .dot-sm {
-  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-}
-.ctrl-status-badge.st-online { background: rgba(34,197,94,0.12); color: var(--success); }
-.ctrl-status-badge.st-online .dot-sm { background: var(--success); }
-.ctrl-status-badge.st-pairing { background: rgba(245,158,11,0.12); color: var(--warning); }
-.ctrl-status-badge.st-pairing .dot-sm { background: var(--warning); }
-.ctrl-status-badge.st-error { background: rgba(239,68,68,0.12); color: var(--danger); }
-.ctrl-status-badge.st-error .dot-sm { background: var(--danger); }
-.ctrl-status-badge.st-disconnected { background: var(--bg-tertiary); color: var(--text-muted); }
-.ctrl-status-badge.st-disconnected .dot-sm { background: var(--text-muted); }
-
-.ctrl-detail-panel {
-  border-top: 1px solid var(--border); background: var(--bg-secondary);
-  overflow: hidden; transition: max-height 0.3s ease;
-}
-.ctrl-detail-panel.collapsed { max-height: 0; border-top: none; }
-.ctrl-detail-panel.expanded { max-height: 600px; }
-.ctrl-detail-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
-}
-.ctrl-detail-header h4 { font-size: 14px; font-weight: 700; margin: 0; }
-.ctrl-detail-close {
-  width: 28px; height: 28px; border-radius: 6px; display: flex;
-  align-items: center; justify-content: center; font-size: 16px;
-  color: var(--text-muted); transition: all var(--transition);
-}
-.ctrl-detail-close:hover { background: var(--bg-hover); color: var(--text-primary); }
-.ctrl-detail-tabs {
-  display: flex; border-bottom: 1px solid var(--border);
-}
-.ctrl-detail-tab {
-  padding: 8px 16px; font-size: 11px; font-weight: 600;
-  color: var(--text-secondary); border-bottom: 2px solid transparent;
-  transition: all var(--transition); cursor: pointer;
-}
-.ctrl-detail-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
-.ctrl-detail-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-.ctrl-detail-body { padding: 16px; overflow-y: auto; max-height: 400px; }
-.ctrl-detail-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 0; font-size: 12px; border-bottom: 1px solid var(--border);
-}
-.ctrl-detail-row:last-child { border-bottom: none; }
-.ctrl-detail-row .label { color: var(--text-secondary); }
-.ctrl-detail-row .value { font-weight: 600; }
-
-.ctrl-resize-handle {
-  width: 5px; cursor: col-resize; background: transparent;
-  transition: background var(--transition); flex-shrink: 0; position: relative;
-}
-.ctrl-resize-handle::after {
-  content: ''; position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%); width: 3px; height: 32px;
-  border-radius: 2px; background: var(--border-strong); transition: background var(--transition);
-}
-.ctrl-resize-handle:hover::after, .ctrl-resize-handle.dragging::after {
-  background: var(--accent); width: 3px;
-}
-.ctrl-resize-handle:hover, .ctrl-resize-handle.dragging {
-  background: var(--accent-dim);
+/* -- Mobile responsive -- */
+@media (max-width: 768px) {
+  .ctrl-side-panel { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  .ctrl-topbar { flex-wrap: wrap; padding: 6px 10px; }
+  .ctrl-topbar-stats { display: none; }
+  .ctrl-topbar-right .ctrl-last-check { display: none; }
+  .ctrl-overview-grid { grid-template-columns: 1fr; }
+  .ctrl-split-panel { flex-direction: column; }
+  .ctrl-split-left { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 200px; }
 }
 
 /* ===== Thread Panel ===== */
@@ -1393,79 +1587,85 @@ a { color: var(--accent); text-decoration: none; }
       </div>
     </div>
 
-    <!-- Control Tower View (관제탑) -->
-    <div id="control-view" style="display:none;flex:1;overflow:hidden;">
-      <div style="display:flex;height:100%;">
-        <!-- Control Main: Agent Monitor + Activity -->
-        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
-          <!-- Status Summary Bar -->
-          <div class="ctrl-status-summary" id="ctrl-status-summary"></div>
-          <!-- Agent Status Cards -->
-          <div style="padding:16px;border-bottom:1px solid var(--border);overflow-x:auto;">
-            <div style="display:flex;gap:12px;min-width:max-content;align-items:center;" id="agent-status-cards"></div>
-            <button onclick="openWizardModal()" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">+ 에이전트 추가</button>
-          </div>
-          <!-- Agent Detail Panel -->
-          <div id="ctrl-detail-panel" class="ctrl-detail-panel collapsed"></div>
-          <!-- Connection Wizard Modal -->
-          <div id="wizard-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
-            <div id="wizard-modal" style="background:var(--bg-primary);border-radius:16px;width:420px;max-width:90vw;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                <h3 style="margin:0;font-size:18px;font-weight:700;">🪄 에이전트 연결 마법사</h3>
-                <button onclick="closeWizardModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;">✕</button>
-              </div>
-              <!-- Step 1: Input -->
-              <div id="wizard-step1">
-                <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">에이전트 이름</label>
-                <input id="wizard-name" type="text" placeholder="예: renover, hermes, claude" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:12px;box-sizing:border-box;">
-                <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Base URL</label>
-                <input id="wizard-url" type="text" placeholder="예: http://192.168.0.110:18789" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:12px;box-sizing:border-box;">
-                <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">API Token (선택)</label>
-                <input id="wizard-token" type="password" placeholder="Gateway 토큰" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:16px;box-sizing:border-box;">
-                <button onclick="wizardAutoDetect()" id="wizard-detect-btn" style="width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🔍 자동 감지</button>
-              </div>
-              <!-- Step 2: Results -->
-              <div id="wizard-step2" style="display:none;">
-                <div id="wizard-spinner" style="text-align:center;padding:40px 0;">
-                  <div style="font-size:32px;margin-bottom:12px;">🔍</div>
-                  <div style="color:var(--text-secondary);">연결 감지 중...</div>
-                </div>
-                <div id="wizard-results" style="display:none;"></div>
-                <div id="wizard-actions" style="display:none;margin-top:16px;display:flex;gap:8px;">
-                  <button onclick="wizardBack()" style="flex:1;padding:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;">← 다시</button>
-                  <button onclick="wizardSave()" id="wizard-save-btn" style="flex:2;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">✅ 등록</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- Activity + Tool Log Tabs -->
-          <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
-            <div class="panel-tabs">
-              <button class="panel-tab active" data-ctrl-tab="activity" onclick="switchCtrlTab('activity')">📊 활동</button>
-              <button class="panel-tab" data-ctrl-tab="tools" onclick="switchCtrlTab('tools')">🔧 도구 로그</button>
-              <button class="panel-tab" data-ctrl-tab="sessions" onclick="switchCtrlTab('sessions')">💻 세션</button>
-              <button class="panel-tab" data-ctrl-tab="chat" onclick="switchCtrlTab('chat')">💬 채팅 로그</button>
-            </div>
-            <div style="flex:1;overflow-y:auto;padding:16px;" id="ctrl-tab-content"></div>
-          </div>
+    <!-- Control Tower View (관제탑) — v3 Two-Column -->
+    <div id="control-view" style="display:none;flex:1;overflow:hidden;flex-direction:column;">
+      <!-- TopBar -->
+      <div class="ctrl-topbar" id="ctrl-topbar">
+        <div class="ctrl-topbar-left">
+          <span class="ctrl-topbar-icon">📡</span>
+          <span class="ctrl-topbar-title">관제탑</span>
+          <div class="ctrl-topbar-stats" id="ctrl-topbar-stats"></div>
         </div>
-        <!-- Control Right: Resize Handle + Stats -->
-        <div class="ctrl-resize-handle" id="ctrl-resize-handle"></div>
-        <div id="ctrl-right-panel" style="width:280px;border-left:1px solid var(--border);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🎯 오늘 토큰</div>
-            <div id="ctrl-token-stats"></div>
+        <div class="ctrl-topbar-right">
+          <span class="ctrl-last-check" id="ctrl-last-check"></span>
+          <label class="ctrl-auto-poll">
+            <input type="checkbox" id="ctrl-auto-poll-cb" checked> 30s
+          </label>
+          <button class="ctrl-topbar-btn ghost" onclick="fetchGateways()" title="새로고침">↻</button>
+          <button class="ctrl-topbar-btn primary" onclick="openWizardModal()">+ Gateway</button>
+        </div>
+      </div>
+      <!-- Main: SidePanel + DetailView -->
+      <div style="display:flex;flex:1;overflow:hidden;">
+        <!-- Side Panel (Gateway list) -->
+        <div class="ctrl-side-panel" id="ctrl-side-panel">
+          <div class="ctrl-side-content">
+            <div class="ctrl-side-header">
+              <span>Gateways <span class="ctrl-gw-count" id="ctrl-gw-count"></span></span>
+              <button class="ctrl-topbar-btn ghost" onclick="openWizardModal()" style="font-size:11px;">+ 추가</button>
+            </div>
+            <div class="ctrl-side-list" id="ctrl-side-list"></div>
           </div>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📈 주간 활동</div>
-            <div id="ctrl-weekly-chart"></div>
+          <div class="ctrl-resize-handle" id="ctrl-resize-handle"></div>
+        </div>
+        <!-- Collapsed toggle (hidden by default) -->
+        <button class="ctrl-panel-toggle" id="ctrl-panel-toggle" style="display:none;" onclick="ctrlToggleSidePanel()">▶</button>
+        <!-- Detail View (main area) -->
+        <div class="ctrl-detail-view" id="ctrl-detail-view">
+          <div class="ctrl-detail-empty" id="ctrl-detail-empty">
+            <div class="empty-icon">📡</div>
+            <div class="empty-title">Chatub 관제탑</div>
+            <div class="empty-desc">왼쪽에서 Gateway를 선택하세요</div>
           </div>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏆 최근 성과</div>
-            <div id="ctrl-achievements"></div>
+          <!-- Detail content (hidden until gateway selected) -->
+          <div id="ctrl-detail-content" style="display:none;flex-direction:column;height:100%;">
+            <div class="ctrl-detail-header" id="ctrl-detail-head"></div>
+            <div class="ctrl-detail-tabs" id="ctrl-detail-tabs-bar"></div>
+            <div class="ctrl-detail-body" id="ctrl-detail-body"></div>
           </div>
         </div>
       </div>
+      <!-- Connection Wizard Modal (unchanged structure) -->
+      <div id="wizard-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+        <div id="wizard-modal" style="background:var(--bg-primary);border-radius:16px;width:420px;max-width:90vw;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h3 style="margin:0;font-size:18px;font-weight:700;">🪄 에이전트 연결 마법사</h3>
+            <button onclick="closeWizardModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;">✕</button>
+          </div>
+          <div id="wizard-step1">
+            <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">에이전트 이름</label>
+            <input id="wizard-name" type="text" placeholder="예: renover, hermes, claude" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:12px;box-sizing:border-box;">
+            <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Base URL</label>
+            <input id="wizard-url" type="text" placeholder="예: http://192.168.0.110:18789" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:12px;box-sizing:border-box;">
+            <label style="font-size:13px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">API Token (선택)</label>
+            <input id="wizard-token" type="password" placeholder="Gateway 토큰" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary);color:var(--text-primary);font-size:14px;margin-bottom:16px;box-sizing:border-box;">
+            <button onclick="wizardAutoDetect()" id="wizard-detect-btn" style="width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🔍 자동 감지</button>
+          </div>
+          <div id="wizard-step2" style="display:none;">
+            <div id="wizard-spinner" style="text-align:center;padding:40px 0;">
+              <div style="font-size:32px;margin-bottom:12px;">🔍</div>
+              <div style="color:var(--text-secondary);">연결 감지 중...</div>
+            </div>
+            <div id="wizard-results" style="display:none;"></div>
+            <div id="wizard-actions" style="display:none;margin-top:16px;display:flex;gap:8px;">
+              <button onclick="wizardBack()" style="flex:1;padding:10px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer;">← 다시</button>
+              <button onclick="wizardSave()" id="wizard-save-btn" style="flex:2;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">✅ 등록</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Toast Container -->
+      <div class="ctrl-toast-container" id="ctrl-toast-container"></div>
     </div>
 
     <!-- Settings View -->
@@ -4485,11 +4685,17 @@ function init() {
 }
 
 // ================================================================
-// CONTROL TOWER (관제탑)
+// CONTROL TOWER (관제탑) — v3 Two-Column Layout
 // ================================================================
 
 let ctrlCurrentTab = 'activity';
 let ctrlGateways = []; // Cached gateway data from API
+let ctrlSelectedGw = null;    // Currently selected gateway for detail panel
+let ctrlDetailTab = 'overview'; // Detail panel active tab
+let ctrlAutoPolling = true;
+let ctrlPollTimer = null;
+let ctrlSidePanelCollapsed = false;
+let ctrlGwAgentsExpanded = {}; // Track expanded agent lists per gateway
 
 // Agent metadata (for display, not from API)
 const AGENT_META = {
@@ -4498,58 +4704,56 @@ const AGENT_META = {
   xiaomi:  { emoji: '🤖', role: 'Backend', color: 'var(--agent-xiaomi)' },
 };
 
-let ctrlSelectedGw = null;    // Currently selected gateway for detail panel
-let ctrlDetailTab = 'overview'; // Detail panel active tab
-
 function renderControlTower() {
   fetchGateways();
-  renderWeeklyChart();
-  renderAchievements();
+  initCtrlAutoPolling();
 }
 
-// Derive 4-level status from gateway health
+// -- Toast notification --
+function ctrlToast(msg, type) {
+  type = type || 'info';
+  var container = $('ctrl-toast-container');
+  if (!container) return;
+  var el = document.createElement('div');
+  el.className = 'ctrl-toast ' + type;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(function() { el.remove(); }, 3000);
+}
+
+// -- Auto polling --
+function initCtrlAutoPolling() {
+  var cb = $('ctrl-auto-poll-cb');
+  if (!cb) return;
+  cb.checked = ctrlAutoPolling;
+  cb.onchange = function() {
+    ctrlAutoPolling = cb.checked;
+    if (ctrlAutoPolling) { startCtrlPolling(); } else { stopCtrlPolling(); }
+  };
+  if (ctrlAutoPolling) startCtrlPolling();
+}
+function startCtrlPolling() { stopCtrlPolling(); ctrlPollTimer = setInterval(fetchGateways, 30000); }
+function stopCtrlPolling() { if (ctrlPollTimer) { clearInterval(ctrlPollTimer); ctrlPollTimer = null; } }
+
+// -- Derive 4-level status --
 function getGwStatus(gw) {
   if (!gw.health) return 'disconnected';
-  const hs = (gw.health.status || '').toLowerCase();
+  var hs = (gw.health.status || '').toLowerCase();
   if (hs === 'connected' || hs === 'online' || gw.health.online === true) return 'online';
   if (hs === 'pairing-required' || hs === 'pairing') return 'pairing';
   if (hs === 'error') return 'error';
   if (hs === 'disconnected' || hs === 'offline') return 'disconnected';
-  // fallback: use legacy online boolean
   return gw.health.online ? 'online' : 'disconnected';
 }
-
-function getGwStatusText(status) {
-  return { online: '연결됨', pairing: '페어링 필요', error: '오류', disconnected: '오프라인' }[status] || '알 수 없음';
-}
-
-function getGwStatusDotClass(status) {
-  return { online: 'online', pairing: 'pairing', error: 'error', disconnected: 'disconnected' }[status] || 'offline';
-}
+function getGwStatusText(s) { return { online: '연결됨', pairing: '페어링 필요', error: '오류', disconnected: '오프라인' }[s] || '알 수 없음'; }
+function getGwStatusBadgeClass(s) { return { online: 'success', pairing: 'info', error: 'danger', disconnected: 'default' }[s] || 'default'; }
 
 function renderLatencyBadge(gw) {
-  const ms = gw.health && gw.health.latencyMs;
+  var ms = gw.health && gw.health.latencyMs;
   if (ms == null || ms === undefined) return '';
-  const cls = ms < 100 ? 'green' : ms < 500 ? 'yellow' : 'red';
-  return `<span class="ctrl-latency ${cls}">⏱ ${ms}ms</span>`;
+  var cls = ms < 100 ? 'green' : ms < 500 ? 'yellow' : 'red';
+  return '<span class="ctrl-latency ' + cls + '">⏱ ' + ms + 'ms</span>';
 }
-
-async function fetchGateways() {
-  try {
-    const resp = await fetch('/api/gateways/');
-    const data = await resp.json();
-    if (data.ok) {
-      ctrlGateways = data.data || [];
-      renderStatusSummary();
-      renderAgentCards();
-      renderTokenStats();
-      renderCtrlTab();
-    }
-  } catch (e) {
-    console.error('[ControlTower] Failed to fetch gateways:', e);
-  }
-}
-
 
 function renderCapBadges(gw) {
   var caps = (gw.health && gw.health.capabilities) || {};
@@ -4565,341 +4769,399 @@ function renderCapBadges(gw) {
     return '<span class="ctrl-cap-badge ' + (on ? 'on' : 'off') + '" title="' + i.key + '">' + i.label + '</span>';
   }).join('');
 }
-function renderAgentCards() {
-  const c = $('agent-status-cards');
-  if (ctrlGateways.length === 0) {
-    c.innerHTML = `<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">
-      <div style="font-size:32px;margin-bottom:8px;">📡</div>
-      등록된 Gateway가 없습니다<br>
-      <span style="font-size:11px;">에이전트 기기에서 /api/gateways/register 로 등록하세요</span>
-    </div>`;
-    return;
-  }
-  c.innerHTML = ctrlGateways.map(gw => {
-    const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: '', color: 'var(--accent)' };
-    const status = getGwStatus(gw);
-    const statusText = getGwStatusText(status);
-    const dotClass = getGwStatusDotClass(status);
-    const latency = renderLatencyBadge(gw);
-    const selected = ctrlSelectedGw && ctrlSelectedGw.id === gw.id ? ' selected' : '';
-    return `
-    <div class="ctrl-agent-card${selected}" onclick="ctrlSelectAgent('${gw.id}')" ondblclick="ctrlHealthCheck('${gw.id}')">
-      <div class="ctrl-agent-avatar" style="background:${meta.color}">${meta.emoji}</div>
-      <div class="ctrl-agent-info">
-        <div class="ctrl-agent-name">${escapeHtml(gw.name)} <span style="font-size:10px;color:var(--text-muted);font-weight:400;">${meta.role || 'Agent'}</span>${latency}</div>
-        <div class="ctrl-agent-status"><span class="dot ${dotClass}"></span>${statusText}<span style="margin-left:6px;font-size:10px;color:var(--text-muted);">${gw.url}</span></div>
-        <div class="ctrl-cap-row">${renderCapBadges(gw)}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
 
-async function ctrlHealthCheck(gwId) {
+// -- Fetch gateways & render all --
+async function fetchGateways() {
   try {
-    const resp = await fetch(`/api/gateways/${gwId}/health`, { method: 'POST' });
-    const data = await resp.json();
+    var resp = await fetch('/api/gateways/');
+    var data = await resp.json();
     if (data.ok) {
-      // Refresh the gateway list
-      const list = await fetch('/api/gateways/');
-      const ld = await list.json();
-      if (ld.ok) { ctrlGateways = ld.data || []; renderAgentCards(); }
+      ctrlGateways = data.data || [];
+      renderTopBarStats();
+      renderSideList();
+      renderDetailView();
+      updateLastCheck();
     }
   } catch (e) {
-    console.error('[ControlTower] Health check failed:', e);
+    console.error('[ControlTower] Failed to fetch gateways:', e);
   }
 }
 
-function switchCtrlTab(tab) {
-  ctrlCurrentTab = tab;
-  $$('[data-ctrl-tab]').forEach(t => t.classList.toggle('active', t.dataset.ctrlTab === tab));
-  renderCtrlTab();
+function updateLastCheck() {
+  var el = $('ctrl-last-check');
+  if (el) el.textContent = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-async function renderCtrlTab() {
-  const c = $('ctrl-tab-content');
-  if (ctrlCurrentTab === 'sessions' || ctrlCurrentTab === 'tools') {
-    if (ctrlGateways.length === 0) {
-      c.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">Gateway가 연결되지 않았습니다</div>';
-      return;
-    }
-  }
-  if (ctrlCurrentTab === 'activity') {
-    renderActivityTab(c);
-  } else if (ctrlCurrentTab === 'tools') {
-    await renderToolsTab(c);
-  } else if (ctrlCurrentTab === 'sessions') {
-    await renderSessionsTab(c);
-  } else if (ctrlCurrentTab === 'chat') {
-    await renderChatLogsTab(c);
-  }
+// -- TopBar Stats --
+function renderTopBarStats() {
+  var el = $('ctrl-topbar-stats');
+  if (!el) return;
+  var counts = { online: 0, pairing: 0, error: 0, disconnected: 0 };
+  ctrlGateways.forEach(function(gw) { var s = getGwStatus(gw); if (counts[s] !== undefined) counts[s]++; });
+  var totalAgents = ctrlGateways.length;
+  var pills = [];
+  if (counts.online) pills.push('<span class="ctrl-stat-pill st-online"><span class="dot-sm"></span>' + counts.online + ' 연결</span>');
+  if (counts.error) pills.push('<span class="ctrl-stat-pill st-error"><span class="dot-sm"></span>' + counts.error + ' 오류</span>');
+  if (counts.pairing) pills.push('<span class="ctrl-stat-pill st-pairing"><span class="dot-sm"></span>' + counts.pairing + ' 페어링</span>');
+  if (counts.disconnected) pills.push('<span class="ctrl-stat-pill st-disconnected"><span class="dot-sm"></span>' + counts.disconnected + ' 오프라인</span>');
+  pills.push('<span class="ctrl-badge-sm default">' + totalAgents + ' gateways</span>');
+  el.innerHTML = pills.join('');
 }
 
-function renderActivityTab(c) {
+// -- Side Panel: Gateway List --
+function renderSideList() {
+  var list = $('ctrl-side-list');
+  var countEl = $('ctrl-gw-count');
+  if (countEl) countEl.textContent = '(' + ctrlGateways.length + ')';
+  if (!list) return;
+
   if (ctrlGateways.length === 0) {
-    c.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">Gateway가 연결되지 않았습니다</div>';
+    list.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:13px;text-align:center;">' +
+      '<div style="font-size:36px;margin-bottom:10px;opacity:0.3;">📡</div>' +
+      '등록된 Gateway가 없습니다<br><span style="font-size:11px;">+ Gateway 버튼으로 추가하세요</span></div>';
     return;
   }
-  c.innerHTML = ctrlGateways.map(gw => {
-    const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', color: 'var(--accent)' };
-    const online = gw.health && gw.health.online;
-    return `<div class="ctrl-activity-item">
-      <div class="ctrl-agent-avatar" style="background:${meta.color};width:32px;height:32px;font-size:16px;border-radius:8px;">${meta.emoji}</div>
-      <div class="ctrl-activity-text">
-        <div class="ctrl-activity-title">${escapeHtml(gw.name)} ${online ? '🟢 연결됨' : '🔴 오프라인'}</div>
-        <div class="ctrl-activity-desc">${escapeHtml(gw.url)}</div>
-      </div>
-    </div>`;
+
+  list.innerHTML = ctrlGateways.map(function(gw) {
+    var meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: '', color: 'var(--accent)' };
+    var status = getGwStatus(gw);
+    var statusText = getGwStatusText(status);
+    var badgeCls = getGwStatusBadgeClass(status);
+    var latencyMs = gw.health && gw.health.latencyMs;
+    var latencyStr = latencyMs != null ? latencyMs + 'ms' : '—';
+    var selected = ctrlSelectedGw && ctrlSelectedGw.id === gw.id ? ' selected' : '';
+    var borderCls = status === 'online' ? ' border-success' : status === 'error' ? ' border-danger' : status === 'pairing' ? ' border-info' : '';
+    var expanded = ctrlGwAgentsExpanded[gw.id];
+    var agentCount = (gw.health && gw.health.agentCount) || 0;
+
+    var agentListHtml = '';
+    if (expanded && gw.health && gw.health.agents && gw.health.agents.length) {
+      agentListHtml = '<div class="ctrl-gw-agent-list">' + gw.health.agents.map(function(a) {
+        return '<div class="ctrl-gw-agent-item"><span>' + (a.emoji || '🤖') + '</span><span style="font-weight:500;">' + escapeHtml(a.name || a.id) + '</span><span class="agent-id">' + (a.id || '').slice(0, 8) + '</span></div>';
+      }).join('') + '</div>';
+    }
+
+    return '<div class="ctrl-gw-card' + selected + borderCls + '" onclick="ctrlSelectGw(\'' + gw.id + '\')" ondblclick="ctrlHealthCheck(\'' + gw.id + '\')">' +
+      '<div class="ctrl-gw-card-head">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">' +
+            '<span class="ctrl-gw-name">' + meta.emoji + ' ' + escapeHtml(gw.name) + '</span>' +
+            '<span class="ctrl-badge-sm ' + badgeCls + '">' + statusText + '</span>' +
+          '</div>' +
+          '<div class="ctrl-gw-url">' + escapeHtml(gw.url) + '</div>' +
+        '</div>' +
+        '<button class="ctrl-topbar-btn ghost" onclick="event.stopPropagation();ctrlHealthCheck(\'' + gw.id + '\')" title="Health Check" style="padding:4px;">↻</button>' +
+      '</div>' +
+      '<div class="ctrl-gw-metrics">' +
+        '<span>⏱ ' + latencyStr + '</span>' +
+        '<span>🤖 ' + agentCount + ' agents</span>' +
+        '<div class="ctrl-cap-row" style="margin-top:0;">' + renderCapBadges(gw) + '</div>' +
+      '</div>' +
+      (agentCount > 0 ? '<button class="ctrl-gw-agents-toggle" onclick="event.stopPropagation();ctrlToggleAgents(\'' + gw.id + '\')">' + (expanded ? '▾' : '▸') + ' agents (' + agentCount + ')</button>' : '') +
+      agentListHtml +
+    '</div>';
   }).join('');
 }
 
-async function renderToolsTab(c) {
-  // Fetch agents from each gateway
-  let allTools = [];
-  for (const gw of ctrlGateways) {
-    try {
-      const resp = await fetch(`/api/gateways/${gw.id}/agents`);
-      const data = await resp.json();
-      const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️' };
-      if (data.ok && data.data) {
-        allTools.push({ agent: gw.name, emoji: meta.emoji, tool: 'Gateway Query', status: 'success', desc: `${gw.url} — agents/models`, time: '방금' });
-      } else {
-        allTools.push({ agent: gw.name, emoji: meta.emoji, tool: 'Gateway Query', status: 'error', desc: data.error || '연결 실패', time: '방금' });
-      }
-    } catch (e) {
-      allTools.push({ agent: gw.name, emoji: '🖥️', tool: 'Gateway Query', status: 'error', desc: e.message, time: '방금' });
-    }
+function ctrlToggleAgents(gwId) {
+  ctrlGwAgentsExpanded[gwId] = !ctrlGwAgentsExpanded[gwId];
+  renderSideList();
+}
+
+// -- Side Panel collapse/expand --
+function ctrlToggleSidePanel() {
+  ctrlSidePanelCollapsed = !ctrlSidePanelCollapsed;
+  var panel = $('ctrl-side-panel');
+  var toggle = $('ctrl-panel-toggle');
+  if (ctrlSidePanelCollapsed) {
+    panel.style.display = 'none';
+    toggle.style.display = 'block';
+    toggle.textContent = '▶';
+  } else {
+    panel.style.display = 'flex';
+    toggle.style.display = 'none';
   }
-  c.innerHTML = allTools.map(t => `
-    <div class="ctrl-tool-item">
-      <span class="ctrl-tool-icon">${t.emoji}</span>
-      <span class="ctrl-tool-name">${t.tool}</span>
-      <span style="flex:1;color:var(--text-secondary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.desc)}</span>
-      <span class="ctrl-tool-status ${t.status}">${t.status === 'success' ? '✓' : '✗'}</span>
-    </div>
-  `).join('');
 }
 
-async function renderSessionsTab(c) {
-  let html = '';
-  for (const gw of ctrlGateways) {
-    const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️' };
-    try {
-      const resp = await fetch(`/api/gateways/${gw.id}/sessions`);
-      const data = await resp.json();
-      const note = data.data && data.data.note ? data.data.note : (data.ok ? '응답됨' : '실패');
-      html += `<div class="ctrl-session-item">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">${meta.emoji}</span>
-          <div>
-            <div style="font-size:13px;font-weight:600;">${escapeHtml(gw.name)}</div>
-            <div class="ctrl-session-route">${escapeHtml(gw.url)}</div>
-          </div>
-          <span style="margin-left:auto;font-size:11px;color:${data.ok ? 'var(--success)' : 'var(--danger)'};">${escapeHtml(note)}</span>
-        </div>
-      </div>`;
-    } catch (e) {
-      html += `<div class="ctrl-session-item"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">${meta.emoji}</span><span style="font-size:13px;color:var(--danger);">연결 실패</span></div></div>`;
-    }
-  }
-  c.innerHTML = html || '<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">Gateway가 연결되지 않았습니다</div>';
-}
-
-function renderTokenStats() {
-  const online = ctrlGateways.filter(g => g.health && g.health.online).length;
-  const total = ctrlGateways.length;
-  $('ctrl-token-stats').innerHTML = `
-    <div class="ctrl-token-row">
-      <span class="ctrl-token-label">📡 온라인 Gateway</span>
-      <span class="ctrl-token-value ${online > 0 ? 'good' : 'warn'}">${online} / ${total}</span>
-    </div>
-    ${ctrlGateways.map(gw => {
-      const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️' };
-      const online = gw.health && gw.health.online;
-      return `<div class="ctrl-token-row">
-        <span class="ctrl-token-label">${meta.emoji} ${escapeHtml(gw.name)}</span>
-        <span class="ctrl-token-value ${online ? 'good' : ''}" style="${online ? '' : 'color:var(--text-muted)'}">${online ? '🟢' : '⚫'}</span>
-      </div>`;
-    }).join('')}`;
-}
-
-function renderWeeklyChart() {
-  // Placeholder chart — will be replaced by actual activity data
-  const days = ['월', '화', '수', '목', '금', '토', '일'];
-  const vals = ctrlGateways.length > 0 ? [3,5,2,8,4,1,6] : [0,0,0,0,0,0,0];
-  const max = Math.max(...vals, 1);
-  $('ctrl-weekly-chart').innerHTML = `<div class="ctrl-chart-bar">${vals.map((v, i) => `
-    <div class="ctrl-chart-col">
-      <div class="ctrl-chart-bar-inner" style="height:${(v/max)*100}%"></div>
-      <span class="ctrl-chart-label">${days[i]}</span>
-    </div>
-  `).join('')}</div>`;
-}
-
-function renderAchievements() {
-  $('ctrl-achievements').innerHTML = [
-    { icon: '🏆', title: '8개 Repo 분석', desc: 'Top 8 완결' },
-    { icon: '📝', title: '블로그 15편', desc: 'GitHub Pages' },
-    { icon: '🚀', title: 'Chatub v2.1', desc: '관제탑 런칭' },
-    { icon: '🎨', title: '픽셀아트', desc: '갤러리 배포' },
-    { icon: '🤝', title: '3에이전트', desc: '협업 시작' },
-  ].map(a => `<div class="ctrl-badge" title="${a.desc}">${a.icon} ${a.title}</div>`).join('');
-}
-
-// ---- Status Summary Bar ----
-function renderStatusSummary() {
-  const el = $('ctrl-status-summary');
-  if (!el) return;
-  const counts = { online: 0, pairing: 0, error: 0, disconnected: 0 };
-  ctrlGateways.forEach(gw => { const s = getGwStatus(gw); if (counts[s] !== undefined) counts[s]++; });
-  const badges = [];
-  if (counts.online)       badges.push(`<span class="ctrl-status-badge st-online"><span class="dot-sm"></span>${counts.online} online</span>`);
-  if (counts.pairing)      badges.push(`<span class="ctrl-status-badge st-pairing"><span class="dot-sm"></span>${counts.pairing} pairing</span>`);
-  if (counts.error)        badges.push(`<span class="ctrl-status-badge st-error"><span class="dot-sm"></span>${counts.error} error</span>`);
-  if (counts.disconnected) badges.push(`<span class="ctrl-status-badge st-disconnected"><span class="dot-sm"></span>${counts.disconnected} offline</span>`);
-  el.innerHTML = badges.length ? badges.join('') + `<span style="margin-left:auto;font-size:10px;color:var(--text-muted);">총 ${ctrlGateways.length}개 에이전트</span>` : '';
-}
-
-// ---- Agent Detail Panel ----
-function ctrlSelectAgent(gwId) {
-  const gw = ctrlGateways.find(g => g.id === gwId);
+// -- Select gateway -> show detail --
+function ctrlSelectGw(gwId) {
+  var gw = ctrlGateways.find(function(g) { return g.id === gwId; });
   if (ctrlSelectedGw && ctrlSelectedGw.id === gwId) {
     ctrlSelectedGw = null;
-    collapseDetailPanel();
+    ctrlDetailTab = 'overview';
   } else {
     ctrlSelectedGw = gw || null;
-    expandDetailPanel();
+    ctrlDetailTab = 'overview';
   }
-  renderAgentCards();
-  renderDetailPanel();
+  renderSideList();
+  renderDetailView();
 }
 
-function expandDetailPanel() {
-  const p = $('ctrl-detail-panel');
-  p.classList.remove('collapsed');
-  p.classList.add('expanded');
-}
-
-function collapseDetailPanel() {
-  const p = $('ctrl-detail-panel');
-  p.classList.remove('expanded');
-  p.classList.add('collapsed');
-}
-
-function switchDetailTab(tab) {
-  ctrlDetailTab = tab;
-  renderDetailPanel();
-}
-
-function renderDetailPanel() {
-  const panel = $('ctrl-detail-panel');
-  if (!ctrlSelectedGw) { panel.innerHTML = ''; return; }
-  const gw = ctrlSelectedGw;
-  const meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: 'Agent', color: 'var(--accent)' };
-  const status = getGwStatus(gw);
-  const statusText = getGwStatusText(status);
-  const dotCls = getGwStatusDotClass(status);
-  const latencyMs = gw.health && gw.health.latencyMs;
-  const tabs = ['overview', 'sessions', 'chat'];
-  const tabLabels = { overview: '📋 개요', sessions: '💻 세션', chat: '💬 채팅' };
-
-  let body = '';
-  const dotColors = { online: 'var(--success)', pairing: 'var(--warning)', error: 'var(--danger)', disconnected: 'var(--text-muted)' };
-  const latencyColor = latencyMs != null ? (latencyMs < 100 ? 'var(--success)' : latencyMs < 500 ? 'var(--warning)' : 'var(--danger)') : '';
-  if (ctrlDetailTab === 'overview') {
-    body = `
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
-        <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:10px;text-align:center;">
-          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">상태</div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:4px;">
-            <span style="width:8px;height:8px;display:inline-block;border-radius:50%;background:${dotColors[status] || 'var(--text-muted)'};"></span>
-            <span style="font-size:12px;font-weight:700;">${statusText}</span>
-          </div>
-        </div>
-        <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:10px;text-align:center;">
-          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">레이턴시</div>
-          <div style="font-size:12px;font-weight:700;${latencyColor ? 'color:' + latencyColor : ''}">${latencyMs != null ? latencyMs + 'ms' : '—'}</div>
-        </div>
-        <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:10px;text-align:center;">
-          <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">역할</div>
-          <div style="font-size:12px;font-weight:700;">${meta.role || 'Agent'}</div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <div class="ctrl-detail-row"><span class="label">ID</span><span class="value" style="font-size:11px;color:var(--text-muted);">${gw.id}</span></div>
-        <div class="ctrl-detail-row"><span class="label">URL</span><span class="value" style="font-size:11px;">${escapeHtml(gw.url)}</span></div>
-        <div class="ctrl-detail-row"><span class="label">기능</span><span class="value">${renderCapBadges(gw)}</span></div>
-      </div>`;
-  } else if (ctrlDetailTab === 'sessions') {
-    body = `<div id="ctrl-detail-sessions" style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px;">로딩 중...</div>`;
-    setTimeout(() => loadDetailSessions(gw), 0);
-  } else if (ctrlDetailTab === 'chat') {
-    body = `<div id="ctrl-detail-chat" style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px;">로딩 중...</div>`;
-    setTimeout(() => loadDetailChat(gw), 0);
-  }
-
-  panel.innerHTML = `
-    <div class="ctrl-detail-header">
-      <h4>${meta.emoji} ${escapeHtml(gw.name)} <span style="font-size:11px;font-weight:400;color:var(--text-secondary);">${meta.role || 'Agent'}</span></h4>
-      <button class="ctrl-detail-close" onclick="ctrlSelectAgent('${gw.id}')" title="닫기">✕</button>
-    </div>
-    <div class="ctrl-detail-tabs">
-      ${tabs.map(t => `<button class="ctrl-detail-tab${ctrlDetailTab === t ? ' active' : ''}" onclick="switchDetailTab('${t}')">${tabLabels[t]}</button>`).join('')}
-    </div>
-    <div class="ctrl-detail-body">${body}</div>`;
-}
-
-async function loadDetailSessions(gw) {
-  const el = $('ctrl-detail-sessions');
-  if (!el) return;
+// -- Health check --
+async function ctrlHealthCheck(gwId) {
   try {
-    const resp = await fetch(`/api/gateways/${gw.id}/sessions`);
-    const data = await resp.json();
-    const note = data.data && data.data.note ? data.data.note : (data.ok ? '응답됨' : '실패');
-    el.innerHTML = `<div class="ctrl-session-item" style="text-align:left;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div style="font-size:13px;font-weight:600;">${escapeHtml(gw.name)}</div>
-        <span style="margin-left:auto;font-size:11px;color:${data.ok ? 'var(--success)' : 'var(--danger)'};">${escapeHtml(note)}</span>
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${escapeHtml(gw.url)}</div>
-    </div>`;
+    ctrlToast('Health check 실행 중...', 'info');
+    var resp = await fetch('/api/gateways/' + gwId + '/health', { method: 'POST' });
+    var data = await resp.json();
+    if (data.ok) {
+      ctrlToast('Health check 완료', 'success');
+      fetchGateways();
+    } else {
+      ctrlToast('Health check 실패', 'error');
+    }
   } catch (e) {
-    el.innerHTML = '<div style="color:var(--danger);font-size:12px;">세션 조회 실패</div>';
+    ctrlToast('Health check 오류: ' + e.message, 'error');
   }
 }
 
-async function loadDetailChat(gw) {
-  const el = $('ctrl-detail-chat');
-  if (!el) return;
+// -- Detail View (right main area) --
+function renderDetailView() {
+  var empty = $('ctrl-detail-empty');
+  var content = $('ctrl-detail-content');
+  if (!ctrlSelectedGw) {
+    if (empty) empty.style.display = 'flex';
+    if (content) content.style.display = 'none';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  if (content) content.style.display = 'flex';
+
+  var gw = ctrlSelectedGw;
+  var meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: 'Agent', color: 'var(--accent)' };
+  var status = getGwStatus(gw);
+  var statusText = getGwStatusText(status);
+  var badgeCls = getGwStatusBadgeClass(status);
+
+  // Header
+  var headEl = $('ctrl-detail-head');
+  if (headEl) {
+    headEl.innerHTML = '<h4>' + meta.emoji + ' ' + escapeHtml(gw.name) +
+      ' <span style="font-size:11px;font-weight:400;color:var(--text-secondary);">' + (meta.role || 'Agent') + '</span>' +
+      ' <span class="ctrl-badge-sm ' + badgeCls + '" style="margin-left:6px;">' + statusText + '</span></h4>' +
+      '<button class="ctrl-detail-close" onclick="ctrlSelectGw(\'' + gw.id + '\')" title="닫기">✕</button>';
+  }
+
+  // Tabs
+  var tabs = [
+    { id: 'overview', label: '개요' },
+    { id: 'sessions', label: '세션' },
+    { id: 'agents', label: '에이전트' },
+    { id: 'chat', label: '채팅' },
+  ];
+  var tabsEl = $('ctrl-detail-tabs-bar');
+  if (tabsEl) {
+    tabsEl.innerHTML = tabs.map(function(t) {
+      return '<button class="ctrl-detail-tab' + (ctrlDetailTab === t.id ? ' active' : '') + '" onclick="ctrlSwitchDetailTab(\'' + t.id + '\')">' + t.label + '</button>';
+    }).join('');
+  }
+
+  // Body
+  renderDetailBody();
+}
+
+function ctrlSwitchDetailTab(tab) {
+  ctrlDetailTab = tab;
+  // Update tab bar active state
+  var tabsEl = $('ctrl-detail-tabs-bar');
+  if (tabsEl) {
+    tabsEl.querySelectorAll('.ctrl-detail-tab').forEach(function(btn) {
+      btn.classList.toggle('active', btn.textContent.trim() === { overview: '개요', sessions: '세션', agents: '에이전트', chat: '채팅' }[tab]);
+    });
+  }
+  renderDetailBody();
+}
+
+function renderDetailBody() {
+  var body = $('ctrl-detail-body');
+  if (!body || !ctrlSelectedGw) return;
+  var gw = ctrlSelectedGw;
+
+  if (ctrlDetailTab === 'overview') {
+    renderDetailOverview(body, gw);
+  } else if (ctrlDetailTab === 'sessions') {
+    body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">로딩 중...</div>';
+    loadDetailSessions(body, gw);
+  } else if (ctrlDetailTab === 'agents') {
+    body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">로딩 중...</div>';
+    loadDetailAgents(body, gw);
+  } else if (ctrlDetailTab === 'chat') {
+    renderDetailChat(body, gw);
+  }
+}
+
+function renderDetailOverview(body, gw) {
+  var meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: 'Agent', color: 'var(--accent)' };
+  var status = getGwStatus(gw);
+  var statusText = getGwStatusText(status);
+  var dotColors = { online: 'var(--success)', pairing: 'var(--info)', error: 'var(--danger)', disconnected: 'var(--text-muted)' };
+  var latencyMs = gw.health && gw.health.latencyMs;
+  var latencyColor = latencyMs != null ? (latencyMs < 100 ? 'var(--success)' : latencyMs < 500 ? 'var(--warning)' : 'var(--danger)') : '';
+  var agentCount = (gw.health && gw.health.agentCount) || 0;
+
+  body.innerHTML = '<div class="ctrl-overview-grid">' +
+    '<div class="ctrl-metric-card"><div class="ctrl-metric-label">상태</div><div class="ctrl-metric-value"><span style="width:8px;height:8px;display:inline-block;border-radius:50%;background:' + (dotColors[status] || 'var(--text-muted)') + ';"></span>' + statusText + '</div></div>' +
+    '<div class="ctrl-metric-card"><div class="ctrl-metric-label">레이턴시</div><div class="ctrl-metric-value"' + (latencyColor ? ' style="color:' + latencyColor + '"' : '') + '>' + (latencyMs != null ? latencyMs + 'ms' : '—') + '</div></div>' +
+    '<div class="ctrl-metric-card"><div class="ctrl-metric-label">에이전트</div><div class="ctrl-metric-value">' + agentCount + '</div></div>' +
+  '</div>' +
+  '<div class="ctrl-metric-card" style="margin-bottom:12px;text-align:left;">' +
+    '<div class="ctrl-metric-label" style="text-align:left;margin-bottom:8px;">정보</div>' +
+    '<div class="ctrl-detail-row"><span class="label">ID</span><span class="value" style="font-size:11px;color:var(--text-muted);font-family:monospace;">' + gw.id + '</span></div>' +
+    '<div class="ctrl-detail-row"><span class="label">URL</span><span class="value" style="font-size:11px;">' + escapeHtml(gw.url) + '</span></div>' +
+    '<div class="ctrl-detail-row"><span class="label">역할</span><span class="value">' + (meta.role || 'Agent') + '</span></div>' +
+    '<div class="ctrl-detail-row"><span class="label">기능</span><span class="value"><div class="ctrl-cap-row" style="margin-top:0;">' + renderCapBadges(gw) + '</div></span></div>' +
+  '</div>' +
+  '<div style="display:flex;gap:8px;">' +
+    '<button class="ctrl-topbar-btn primary" onclick="ctrlHealthCheck(\'' + gw.id + '\')" style="flex:1;">↻ Health Check</button>' +
+  '</div>';
+}
+
+async function loadDetailSessions(body, gw) {
   try {
-    const resp = await fetch(`/api/gateways/chat-logs?gateway_id=${gw.id}&limit=20`);
-    const data = await resp.json();
-    if (!data.ok || !data.data || data.data.length === 0) {
-      el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">채팅 기록이 없습니다</div>';
+    var resp = await fetch('/api/gateways/' + gw.id + '/sessions');
+    var data = await resp.json();
+    if (!data.ok) { body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">세션 조회 실패</div>'; return; }
+    var note = data.data && data.data.note ? data.data.note : '응답됨';
+    var sessions = (data.data && data.data.sessions) || [];
+    if (sessions.length === 0) {
+      body.innerHTML = '<div class="ctrl-session-item" style="text-align:left;">' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<div style="font-size:13px;font-weight:600;">' + escapeHtml(gw.name) + '</div>' +
+          '<span style="margin-left:auto;font-size:11px;color:var(--success);">' + escapeHtml(note) + '</span>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + escapeHtml(gw.url) + '</div>' +
+      '</div>';
       return;
     }
-    el.innerHTML = data.data.map(l => {
-      const isUser = l.role === 'user';
-      const time = new Date(l.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-      return `<div style="padding:6px 0;border-bottom:1px solid var(--border);text-align:left;">
-        <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-          <span style="font-size:11px;font-weight:600;color:${isUser ? 'var(--accent)' : 'var(--success)'};">${isUser ? '요청' : '응답'}</span>
-          <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${time}</span>
-        </div>
-        <div style="font-size:12px;color:var(--text-primary);">${escapeHtml(l.content)}</div>
-      </div>`;
+    body.innerHTML = sessions.map(function(s) {
+      return '<div class="ctrl-session-item">' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<span style="font-size:13px;font-weight:600;">' + escapeHtml(s.id || s.name || 'Session') + '</span>' +
+          '<span style="margin-left:auto;font-size:10px;color:var(--text-muted);">' + (s.created_at ? new Date(s.created_at).toLocaleString('ko-KR') : '') + '</span>' +
+        '</div></div>';
     }).join('');
   } catch (e) {
-    el.innerHTML = '<div style="color:var(--danger);font-size:12px;">채팅 로그 조회 실패</div>';
+    body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">세션 조회 실패</div>';
   }
 }
 
-// ---- Right Panel Resize Handle ----
+async function loadDetailAgents(body, gw) {
+  try {
+    var resp = await fetch('/api/gateways/' + gw.id + '/agents');
+    var data = await resp.json();
+    if (!data.ok || !data.data || data.data.length === 0) {
+      body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">에이전트 정보 없음</div>';
+      return;
+    }
+    body.innerHTML = data.data.map(function(a) {
+      return '<div class="ctrl-session-item" style="display:flex;align-items:center;gap:10px;">' +
+        '<div class="ctrl-agent-avatar" style="width:36px;height:36px;font-size:18px;border-radius:8px;background:var(--accent);">' + (a.emoji || '🤖') + '</div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13px;font-weight:600;">' + escapeHtml(a.name || a.id) + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);font-family:monospace;">' + (a.id || '') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">에이전트 조회 실패</div>';
+  }
+}
+
+// -- Detail Chat Tab (with streaming) --
+function renderDetailChat(body, gw) {
+  var meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: 'Agent' };
+  body.innerHTML = '<div class="ctrl-chat-container">' +
+    '<div class="ctrl-chat-header">' +
+      '<span style="font-weight:700;font-size:13px;">' + meta.emoji + ' ' + escapeHtml(gw.name) + ' 채팅</span>' +
+      '<button class="ctrl-topbar-btn ghost" onclick="ctrlLoadChatHistory(\'' + gw.id + '\')">↻ 기록</button>' +
+    '</div>' +
+    '<div class="ctrl-chat-messages" id="ctrl-chat-msgs"></div>' +
+    '<div class="ctrl-chat-input">' +
+      '<input type="text" id="ctrl-chat-input" placeholder="메시지를 입력하세요..." onkeydown="if(event.key===\'Enter\')ctrlSendChat(\'' + gw.id + '\')">' +
+      '<button onclick="ctrlSendChat(\'' + gw.id + '\')">전송</button>' +
+    '</div>' +
+  '</div>';
+  // Load history
+  ctrlLoadChatHistory(gw.id);
+}
+
+async function ctrlLoadChatHistory(gwId) {
+  var msgs = $('ctrl-chat-msgs');
+  if (!msgs) return;
+  try {
+    var resp = await fetch('/api/gateways/chat-logs?gateway_id=' + gwId + '&limit=20');
+    var data = await resp.json();
+    if (!data.ok || !data.data || data.data.length === 0) {
+      msgs.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:12px;padding:20px;">채팅 기록이 없습니다</div>';
+      return;
+    }
+    msgs.innerHTML = data.data.map(function(l) {
+      var isUser = l.role === 'user';
+      var time = new Date(l.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      if (isUser) {
+        return '<div class="ctrl-chat-bubble user"><div><div class="bubble-content">' + escapeHtml(l.content) + '</div><div style="font-size:10px;color:var(--text-muted);text-align:right;margin-top:2px;">' + time + '</div></div></div>';
+      } else {
+        var meta2 = AGENT_META[(l.agent_name || '').toLowerCase()] || {};
+        return '<div class="ctrl-chat-bubble agent"><div><div class="bubble-name">' + (meta2.emoji || '🤖') + ' ' + escapeHtml(l.agent_name || 'Agent') + '</div><div class="bubble-content">' + escapeHtml(l.content) + '</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px;">' + time + '</div></div></div>';
+      }
+    }).join('');
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch (e) {
+    msgs.innerHTML = '<div style="text-align:center;color:var(--danger);font-size:12px;padding:20px;">채팅 기록 로딩 실패</div>';
+  }
+}
+
+async function ctrlSendChat(gwId) {
+  var input = $('ctrl-chat-input');
+  var text = input ? input.value.trim() : '';
+  if (!text) return;
+  input.value = '';
+  input.disabled = true;
+
+  var msgs = $('ctrl-chat-msgs');
+  // Add user bubble
+  msgs.innerHTML += '<div class="ctrl-chat-bubble user"><div><div class="bubble-content">' + escapeHtml(text) + '</div></div></div>';
+
+  // Add streaming bubble
+  var streamId = 'ctrl-stream-' + Date.now();
+  var gw = ctrlGateways.find(function(g) { return g.id === gwId; });
+  var meta = gw ? (AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️' }) : { emoji: '🖥️' };
+  msgs.innerHTML += '<div class="ctrl-chat-bubble agent" id="' + streamId + '"><div><div class="bubble-name">' + meta.emoji + ' ' + escapeHtml(gw ? gw.name : 'Agent') + '</div><div class="bubble-content"><span class="streaming-cursor"></span></div></div></div>';
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    var resp = await fetch('/api/gateway-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gateway_id: gwId, messages: [{ role: 'user', content: text }] })
+    });
+    var data = await resp.json();
+    var bubble = document.getElementById(streamId);
+    if (bubble) {
+      var contentEl = bubble.querySelector('.bubble-content');
+      if (data.ok && data.data) {
+        contentEl.textContent = data.data.content || data.data;
+      } else {
+        contentEl.innerHTML = '<span style="color:var(--danger);">응답 실패</span>';
+      }
+    }
+  } catch (e) {
+    var bubble = document.getElementById(streamId);
+    if (bubble) {
+      bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--danger);">전송 실패: ' + escapeHtml(e.message) + '</span>';
+    }
+  }
+  input.disabled = false;
+  input.focus();
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// -- Side Panel Resize Handle --
 (function initCtrlResize() {
-  const handle = $('ctrl-resize-handle');
-  const panel = $('ctrl-right-panel');
+  var handle = $('ctrl-resize-handle');
+  var panel = $('ctrl-side-panel');
   if (!handle || !panel) return;
-  const MIN_W = 200, MAX_W = 500;
-  let dragging = false, startX = 0, startW = 0;
+  var MIN_W = 280, MAX_W = 520;
+  var dragging = false, startX = 0, startW = 0;
 
   handle.addEventListener('mousedown', function(e) {
     e.preventDefault();
@@ -4913,8 +5175,7 @@ async function loadDetailChat(gw) {
 
   document.addEventListener('mousemove', function(e) {
     if (!dragging) return;
-    const diff = startX - e.clientX;
-    const newW = Math.min(MAX_W, Math.max(MIN_W, startW + diff));
+    var newW = Math.min(MAX_W, Math.max(MIN_W, startW + (e.clientX - startX)));
     panel.style.width = newW + 'px';
   });
 
@@ -4937,8 +5198,7 @@ async function loadDetailChat(gw) {
 
   document.addEventListener('touchmove', function(e) {
     if (!dragging) return;
-    const diff = startX - e.touches[0].clientX;
-    const newW = Math.min(MAX_W, Math.max(MIN_W, startW + diff));
+    var newW = Math.min(MAX_W, Math.max(MIN_W, startW + (e.touches[0].clientX - startX)));
     panel.style.width = newW + 'px';
   });
 
@@ -5018,37 +5278,7 @@ const _origCallAI = typeof callAI !== 'undefined' ? callAI : null;
 init();
 setTimeout(initAgentSelectBar, 2000);
 
-// ---- Chat Logs Tab ----
-async function renderChatLogsTab(c) {
-  let allLogs = [];
-  for (const gw of ctrlGateways) {
-    try {
-      const resp = await fetch(`/api/gateways/chat-logs?gateway_id=${gw.id}&limit=30`);
-      const data = await resp.json();
-      if (data.ok && data.data) {
-        allLogs = allLogs.concat(data.data.map(l => ({ ...l, gw_name: gw.name })));
-      }
-    } catch(e) {}
-  }
-  if (allLogs.length === 0) {
-    c.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:13px;text-align:center;">채팅 기록이 없습니다</div>';
-    return;
-  }
-  c.innerHTML = allLogs.map(l => {
-    const meta = AGENT_META[(l.gw_name || '').toLowerCase()] || { emoji: '🖥️' };
-    const isUser = l.role === 'user';
-    const time = new Date(l.created_at).toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'});
-    const tokenInfo = l.tokens_prompt || l.tokens_completion ? ` <span style="font-size:10px;color:var(--text-muted)">(${l.tokens_prompt}+${l.tokens_completion}tok)</span>` : '';
-    return `<div style="padding:8px 12px;border-bottom:1px solid var(--border-color);">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-        <span style="font-size:14px;">${meta.emoji}</span>
-        <span style="font-size:12px;font-weight:600;color:${isUser ? 'var(--accent)' : 'var(--success)'};">${escapeHtml(l.gw_name || 'Unknown')} ${isUser ? '(요청)' : '(응답)'}${tokenInfo}</span>
-        <span style="margin-left:auto;font-size:10px;color:var(--text-muted);">${time}</span>
-      </div>
-      <div style="font-size:13px;color:var(--text-primary);padding-left:22px;">${escapeHtml(l.content)}</div>
-    </div>`;
-  }).join('');
-}
+// ---- Chat Logs (legacy compat — now in detail chat tab) ----
 
 // ─── Connection Wizard ───────────────────────────────────────
 let wizardDetectResult = null;
