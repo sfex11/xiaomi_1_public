@@ -4771,8 +4771,14 @@ function initCtrlAutoPolling() {
     if (ctrlAutoPolling) { startCtrlPolling(); } else { stopCtrlPolling(); }
   };
   if (ctrlAutoPolling) startCtrlPolling();
+  // Dynamic polling: 15s when visible, 60s when hidden
+  document.addEventListener('visibilitychange', function() {
+    if (!ctrlAutoPolling) return;
+    stopCtrlPolling();
+    if (!document.hidden) startCtrlPolling();
+  });
 }
-function startCtrlPolling() { stopCtrlPolling(); ctrlPollTimer = setInterval(fetchGateways, 30000); }
+function startCtrlPolling() { stopCtrlPolling(); var interval = document.hidden ? 60000 : 15000; ctrlPollTimer = setInterval(fetchGateways, interval); }
 function stopCtrlPolling() { if (ctrlPollTimer) { clearInterval(ctrlPollTimer); ctrlPollTimer = null; } }
 
 // -- Derive 4-level status --
@@ -5384,6 +5390,8 @@ var _ctrlChatWs = {};  // {gwId: WebSocket}
 
 function _getOrCreateChatWs(gwId) {
   if (_ctrlChatWs[gwId] && _ctrlChatWs[gwId].readyState <= 1) return _ctrlChatWs[gwId];
+  // Clean up old connection
+  if (_ctrlChatWs[gwId]) { try { _ctrlChatWs[gwId].close(); } catch(_){} }
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   var ws = new WebSocket(proto + '//' + location.host + '/ws/chat/' + gwId);
   _ctrlChatWs[gwId] = ws;
@@ -5433,7 +5441,7 @@ async function ctrlSendChat(gwId) {
         msgs.scrollTop = msgs.scrollHeight;
       } else if (data.type === 'chat.done') {
         if (bubble) {
-          if (data.full) bubble.querySelector('.bubble-content').textContent = data.full;
+          if (data.full) bubble.querySelector('.bubble-content').innerHTML = renderMarkdown(data.full);
           else if (!fullContent) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--text-muted);">(빈 응답)</span>';
         }
         _cleanup();
@@ -5455,11 +5463,35 @@ async function ctrlSendChat(gwId) {
   } else if (ws.readyState === 0) {
     ws.onopen = function() { _send(); };
   } else {
-    // Reconnect
+    // Reconnect: force new WebSocket
+    _ctrlChatWs[gwId] = null;
     ws = _getOrCreateChatWs(gwId);
+    ws.onmessage = function(ev) {
+      try {
+        var data = JSON.parse(ev.data);
+        var bubble = document.getElementById(streamId);
+        if (data.type === 'chat.chunk') {
+          fullContent += data.content;
+          if (bubble) bubble.querySelector('.bubble-content').innerHTML = renderMarkdown(fullContent);
+          msgs.scrollTop = msgs.scrollHeight;
+        } else if (data.type === 'chat.done') {
+          if (bubble) {
+            if (data.full) bubble.querySelector('.bubble-content').textContent = data.full;
+            else if (!fullContent) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--text-muted);">(빈 응답)</span>';
+          }
+          _cleanup();
+        } else if (data.type === 'chat.error') {
+          if (bubble) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--danger);">오류: ' + escapeHtml(data.error || '알 수 없음') + '</span>';
+          _cleanup();
+        }
+      } catch (_) {}
+    };
+    ws.onerror = function() {
+      var bubble = document.getElementById(streamId);
+      if (bubble) bubble.querySelector('.bubble-content').innerHTML = '<span style="color:var(--danger);">WebSocket 재연결 실패</span>';
+      _cleanup();
+    };
     ws.onopen = function() { _send(); };
-    ws.onmessage = ws.onmessage;
-    ws.onerror = ws.onerror;
   }
 }
 
