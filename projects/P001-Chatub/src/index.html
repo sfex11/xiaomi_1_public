@@ -873,6 +873,7 @@ a { color: var(--accent); text-decoration: none; }
 .ctrl-session-msg.role-assistant { background: var(--ai-bg); border-left: 3px solid var(--success); }
 .ctrl-session-msg .msg-role { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; color: var(--text-muted); }
 .ctrl-session-msg .msg-content { color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+.ctrl-session-msg .msg-time { float: right; font-weight: 400; color: var(--text-muted); font-size: 9px; }
 
 /* -- Mobile responsive -- */
 .ctrl-mobile-toggle { display: none; }
@@ -5238,8 +5239,10 @@ function _renderSessionMessages(body, gw, sessionId, messages) {
     var roleLabel = role === 'user' ? '👤 User' : (meta.emoji + ' ' + escapeHtml(gw.name));
     var content = m.content || m.text || '';
     if (typeof content === 'object') content = JSON.stringify(content, null, 2);
+    var ts = m.created_at || m.timestamp || m.time || '';
+    var timeHtml = ts ? '<span class="msg-time">' + new Date(ts).toLocaleString('ko-KR') + '</span>' : '';
     return '<div class="ctrl-session-msg ' + roleCls + '">' +
-      '<div class="msg-role">' + roleLabel + '</div>' +
+      '<div class="msg-role">' + roleLabel + timeHtml + '</div>' +
       '<div class="msg-content">' + escapeHtml(content) + '</div>' +
     '</div>';
   }).join('');

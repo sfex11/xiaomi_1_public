@@ -454,6 +454,26 @@ async def get_gateway_sessions(gateway_id: str):
         db.close()
 
 
+@router.get("/{gateway_id}/sessions/{session_key}")
+async def get_gateway_session(gateway_id: str, session_key: str):
+    """Get a single session's messages from a specific gateway via adapter."""
+    db = get_db()
+    try:
+        gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
+        if not gw:
+            return {"ok": False, "error": "Gateway not found"}
+
+        adapter = _adapter_for(gw)
+        if not hasattr(adapter, 'get_session'):
+            return {"ok": False, "error": "Session detail not supported"}
+        result = await adapter.get_session(gw["url"], decrypt(gw["token"] or ""), session_key)
+        return {"ok": True, "data": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
 @router.get("/{gateway_id}/files")
 async def get_gateway_files(gateway_id: str):
     """List available config files from a gateway."""

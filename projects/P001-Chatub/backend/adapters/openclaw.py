@@ -282,6 +282,40 @@ class OpenClawAdapter(AgentAdapter):
         # 3) Both failed
         return {"sessions": [], "note": "sessions not available"}
 
+    # ── get_session ─────────────────────────────────────────────
+
+    async def get_session(self, url: str, token: str, session_key: str) -> dict:
+        """Fetch a single session's messages by session key."""
+        base = url.rstrip("/")
+
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+            # 1) Try GET /api/sessions/{session_key}
+            try:
+                r = await c.get(f"{base}/api/sessions/{session_key}", headers=_headers(token))
+                if r.status_code < 400:
+                    data = r.json()
+                    if isinstance(data, dict):
+                        return data
+                    if isinstance(data, list):
+                        return {"messages": data}
+            except Exception:
+                pass
+
+            # 2) Fallback: POST /tools/invoke session_get
+            try:
+                payload = {"tool": "session_get", "action": "json", "args": {"session_id": session_key}}
+                r = await c.post(f"{base}/tools/invoke", json=payload, headers=_headers(token))
+                if r.status_code < 400:
+                    data = r.json()
+                    if isinstance(data, dict):
+                        return data
+                    if isinstance(data, list):
+                        return {"messages": data}
+            except Exception:
+                pass
+
+        return {"messages": [], "note": "session detail not available"}
+
     # ── list_agents ──────────────────────────────────────────────────
 
     async def list_agents(self, url: str, token: str) -> list[dict]:

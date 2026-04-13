@@ -285,7 +285,9 @@ def _register_rpc_methods():
             db.close()
         kind = gw["kind"] if "kind" in gw.keys() else "openclaw"
         adapter = create_adapter(kind or "openclaw")
-        # Use list_sessions as baseline (most adapters don't have get by id)
+        if hasattr(adapter, 'get_session') and session_id:
+            return await adapter.get_session(gw["url"], decrypt(gw["token"] or ""), session_id)
+        # Fallback: filter from list_sessions
         sessions = await adapter.list_sessions(gw["url"], decrypt(gw["token"] or ""))
         if isinstance(sessions, list) and session_id:
             for s in sessions:
