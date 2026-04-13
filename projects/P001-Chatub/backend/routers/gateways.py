@@ -494,6 +494,32 @@ async def get_gateway_file(gateway_id: str, filename: str):
         db.close()
 
 
+@router.put("/{gateway_id}/files/{filename}")
+async def save_gateway_file(gateway_id: str, filename: str, request: Request):
+    """Save content to a specific config file on a gateway."""
+    body = await request.body()
+    data = json.loads(body)
+    content = data.get("content", "")
+
+    db = get_db()
+    try:
+        gw = db.execute("SELECT * FROM gateways WHERE id=?", (gateway_id,)).fetchone()
+        if not gw:
+            return {"ok": False, "error": "Gateway not found"}
+
+        adapter = _adapter_for(gw)
+        if not hasattr(adapter, 'save_file'):
+            return {"ok": False, "error": "File write not supported for this gateway type"}
+        result = await adapter.save_file(gw["url"], decrypt(gw["token"] or ""), filename, content)
+        if result.get("ok"):
+            return {"ok": True, "data": result}
+        return {"ok": False, "error": result.get("error", "Unknown error")}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
 @router.get("/{gateway_id}/history")
 async def get_gateway_history(gateway_id: str, limit: int = 20):
     """Get chat history from a specific gateway."""

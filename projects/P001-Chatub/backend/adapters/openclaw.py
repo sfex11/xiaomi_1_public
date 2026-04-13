@@ -348,6 +348,19 @@ class OpenClawAdapter(AgentAdapter):
         content = data if isinstance(data, str) else data.get("content", data.get("result", str(data)))
         return {"name": filename, "content": content}
 
+    async def save_file(self, url: str, token: str, filename: str, content: str) -> dict:
+        """Write content to a file on the gateway via tools/invoke files_write."""
+        base = url.rstrip("/")
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as c:
+            r = await c.post(
+                f"{base}/tools/invoke",
+                json={"tool": "files_write", "action": "json", "args": {"path": filename, "content": content}},
+                headers=_headers(token),
+            )
+            if r.status_code >= 400:
+                return {"ok": False, "error": f"HTTP {r.status_code}"}
+            return {"ok": True, "name": filename}
+
     # ── get_capabilities ─────────────────────────────────────────────
 
     async def get_capabilities(self, url: str, token: str) -> dict[str, bool]:
