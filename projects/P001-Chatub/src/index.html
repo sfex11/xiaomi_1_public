@@ -866,6 +866,13 @@ a { color: var(--accent); text-decoration: none; }
   border: 1px solid var(--border); margin-bottom: 8px;
 }
 .ctrl-session-route { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.ctrl-session-item.clickable { cursor: pointer; transition: all 150ms ease; }
+.ctrl-session-item.clickable:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-glow); }
+.ctrl-session-msg { padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; font-size: 12px; line-height: 1.5; }
+.ctrl-session-msg.role-user { background: var(--accent-dim); border-left: 3px solid var(--accent); }
+.ctrl-session-msg.role-assistant { background: var(--ai-bg); border-left: 3px solid var(--success); }
+.ctrl-session-msg .msg-role { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; color: var(--text-muted); }
+.ctrl-session-msg .msg-content { color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
 
 /* -- Mobile responsive -- */
 .ctrl-mobile-toggle { display: none; }
@@ -1609,6 +1616,8 @@ a { color: var(--accent); text-decoration: none; }
             <input type="checkbox" id="ctrl-auto-poll-cb" checked> 30s
           </label>
           <button class="ctrl-topbar-btn ghost" onclick="fetchGateways()" title="새로고침">↻</button>
+          <div class="ctrl-topbar-divider"></div>
+          <button class="ctrl-topbar-btn ghost" id="ctrl-theme-toggle" onclick="ctrlToggleTheme()" title="다크/라이트 모드 전환">🌙</button>
           <button class="ctrl-topbar-btn primary" onclick="openWizardModal()">+ Gateway</button>
         </div>
       </div>
@@ -4711,9 +4720,32 @@ const AGENT_META = {
   xiaomi:  { emoji: '🤖', role: 'Backend', color: 'var(--agent-xiaomi)' },
 };
 
+// -- Dark/Light theme toggle --
+function ctrlToggleTheme() {
+  var html = document.documentElement;
+  var current = html.getAttribute('data-theme');
+  var next = current === 'light' ? '' : 'light';
+  if (next) { html.setAttribute('data-theme', 'light'); } else { html.removeAttribute('data-theme'); }
+  localStorage.setItem('chatub-theme', next || 'dark');
+  _updateThemeBtn();
+}
+function _updateThemeBtn() {
+  var btn = $('ctrl-theme-toggle');
+  if (!btn) return;
+  var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  btn.textContent = isLight ? '☀️' : '🌙';
+  btn.title = isLight ? '다크 모드로 전환' : '라이트 모드로 전환';
+}
+(function _initTheme() {
+  var saved = localStorage.getItem('chatub-theme');
+  if (saved === 'light') { document.documentElement.setAttribute('data-theme', 'light'); }
+  setTimeout(_updateThemeBtn, 0);
+})();
+
 function renderControlTower() {
   fetchGateways();
   initCtrlAutoPolling();
+  _updateThemeBtn();
 }
 
 // -- Toast notification --
@@ -5119,15 +5151,100 @@ async function loadDetailSessions(body, gw) {
       return;
     }
     body.innerHTML = sessions.map(function(s) {
-      return '<div class="ctrl-session-item">' +
+      var sid = escapeHtml(s.id || s.name || 'Session');
+      return '<div class="ctrl-session-item clickable" onclick="ctrlViewSession(\'' + gw.id + '\',\'' + sid + '\')">' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<span style="font-size:13px;font-weight:600;">' + escapeHtml(s.id || s.name || 'Session') + '</span>' +
+          '<span style="font-size:13px;font-weight:600;">💬 ' + sid + '</span>' +
           '<span style="margin-left:auto;font-size:10px;color:var(--text-muted);">' + (s.created_at ? new Date(s.created_at).toLocaleString('ko-KR') : '') + '</span>' +
-        '</div></div>';
+        '</div>' +
+        (s.message_count ? '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">' + s.message_count + ' messages</div>' : '') +
+      '</div>';
     }).join('');
   } catch (e) {
     body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">세션 조회 실패</div>';
   }
+}
+
+async function ctrlViewSession(gwId, sessionId) {
+  var body = $('ctrl-detail-body');
+  if (!body) return;
+  body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">세션 메시지 로딩 중...</div>';
+  try {
+    var gw = ctrlGateways.find(function(g) { return g.id === gwId; });
+    if (!gw) { body.innerHTML = '<div style="color:var(--danger);padding:16px;text-align:center;">Gateway를 찾을 수 없습니다</div>'; return; }
+
+    // Try WebSocket RPC sessions.get
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var wsUrl = proto + '//' + location.host + '/ws/rpc';
+    var ws = new WebSocket(wsUrl);
+    var timeout = setTimeout(function() { ws.close(); _fallbackSessionFetch(body, gw, sessionId); }, 5000);
+
+    ws.onopen = function() {
+      ws.send(JSON.stringify({ method: 'sessions.get', id: 'sess-' + Date.now(), params: { gateway_id: gwId, session_id: sessionId } }));
+    };
+    ws.onmessage = function(ev) {
+      clearTimeout(timeout);
+      ws.close();
+      try {
+        var data = JSON.parse(ev.data);
+        // RPC response format: {id, data: ...} or {id, error: ...}
+        var result = data.data || data.result || data;
+        var messages = result.messages || (Array.isArray(result) ? result : []);
+        _renderSessionMessages(body, gw, sessionId, messages);
+      } catch (e) {
+        _fallbackSessionFetch(body, gw, sessionId);
+      }
+    };
+    ws.onerror = function() {
+      clearTimeout(timeout);
+      _fallbackSessionFetch(body, gw, sessionId);
+    };
+  } catch (e) {
+    body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">세션 로딩 실패: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function _fallbackSessionFetch(body, gw, sessionId) {
+  // Fallback: try REST API for session messages
+  try {
+    var resp = await fetch('/api/gateways/' + gw.id + '/sessions/' + encodeURIComponent(sessionId));
+    var data = await resp.json();
+    var messages = [];
+    if (data.ok && data.data) {
+      messages = data.data.messages || data.data || [];
+    }
+    _renderSessionMessages(body, gw, sessionId, messages);
+  } catch (e) {
+    _renderSessionMessages(body, gw, sessionId, []);
+  }
+}
+
+function _renderSessionMessages(body, gw, sessionId, messages) {
+  var meta = AGENT_META[gw.name.toLowerCase()] || { emoji: '🖥️', role: 'Agent' };
+  var header = '<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">' +
+    '<button class="ctrl-topbar-btn ghost" onclick="ctrlSwitchDetailTab(\'sessions\')" style="padding:4px 8px;">←</button>' +
+    '<span style="font-size:14px;font-weight:700;">💬 ' + escapeHtml(sessionId) + '</span>' +
+    '<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">' + messages.length + ' messages</span>' +
+  '</div>';
+
+  if (!messages || messages.length === 0) {
+    body.innerHTML = header + '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px;">메시지가 없거나 조회할 수 없습니다</div>';
+    return;
+  }
+
+  var msgsHtml = messages.map(function(m) {
+    var role = (m.role || 'unknown').toLowerCase();
+    var roleCls = role === 'user' ? 'role-user' : 'role-assistant';
+    var roleLabel = role === 'user' ? '👤 User' : (meta.emoji + ' ' + escapeHtml(gw.name));
+    var content = m.content || m.text || '';
+    if (typeof content === 'object') content = JSON.stringify(content, null, 2);
+    return '<div class="ctrl-session-msg ' + roleCls + '">' +
+      '<div class="msg-role">' + roleLabel + '</div>' +
+      '<div class="msg-content">' + escapeHtml(content) + '</div>' +
+    '</div>';
+  }).join('');
+
+  body.innerHTML = header + '<div style="max-height:calc(100vh - 280px);overflow-y:auto;">' + msgsHtml + '</div>';
 }
 
 async function loadDetailFiles(body, gw) {
@@ -5172,10 +5289,46 @@ async function ctrlViewFile(gwId, filename) {
         '<button class="ctrl-topbar-btn ghost" onclick="ctrlSwitchDetailTab(\'files\')" style="padding:4px 8px;">←</button>' +
         '<span style="font-size:14px;font-weight:700;">📄 ' + escapeHtml(filename) + '</span>' +
       '</div>' +
+      '<div style="display:flex;align-items:center;gap:6px;">' +
+        '<span id="ctrl-file-status" style="font-size:11px;color:var(--text-muted);"></span>' +
+        '<button class="ctrl-topbar-btn primary" id="ctrl-file-save-btn" onclick="ctrlSaveFile(\'' + gwId + '\',\'' + escapeHtml(filename) + '\')">💾 저장</button>' +
+      '</div>' +
     '</div>' +
-    '<pre style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;color:var(--text-secondary);max-height:calc(100vh - 300px);overflow-y:auto;">' + escapeHtml(data.data.content) + '</pre>';
+    '<textarea id="ctrl-file-editor" style="width:100%;min-height:calc(100vh - 300px);background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:12px;line-height:1.6;color:var(--text-secondary);font-family:monospace;resize:vertical;box-sizing:border-box;">' + escapeHtml(data.data.content) + '</textarea>';
   } catch (e) {
     body.innerHTML = '<div style="color:var(--danger);font-size:12px;text-align:center;padding:16px;">파일 로딩 실패: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+// -- Save file via PUT --
+async function ctrlSaveFile(gwId, filename) {
+  var editor = $('ctrl-file-editor');
+  var statusEl = $('ctrl-file-status');
+  var saveBtn = $('ctrl-file-save-btn');
+  if (!editor) return;
+  var content = editor.value;
+  if (saveBtn) saveBtn.disabled = true;
+  if (statusEl) statusEl.textContent = '저장 중...';
+  try {
+    var resp = await fetch('/api/gateways/' + gwId + '/files/' + encodeURIComponent(filename), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: content })
+    });
+    var data = await resp.json();
+    if (data.ok) {
+      if (statusEl) { statusEl.style.color = 'var(--success)'; statusEl.textContent = '저장 완료'; }
+      ctrlToast('파일 저장 완료: ' + filename, 'success');
+    } else {
+      if (statusEl) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = '저장 실패: ' + (data.error || ''); }
+      ctrlToast('파일 저장 실패', 'error');
+    }
+  } catch (e) {
+    if (statusEl) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = '오류: ' + e.message; }
+    ctrlToast('파일 저장 오류', 'error');
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+    setTimeout(function() { if (statusEl) { statusEl.textContent = ''; statusEl.style.color = ''; } }, 3000);
   }
 }
 
