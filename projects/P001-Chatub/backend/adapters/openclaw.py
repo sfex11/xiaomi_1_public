@@ -322,13 +322,14 @@ class OpenClawAdapter(AgentAdapter):
         """Extract agent info from /api/sessions and health check data."""
         agents_map: dict[str, dict] = {}
 
-        # 1) Get agents from health check (/v1/models agent IDs)
-        hs = await self.health(url, token)
+        # Parallel fetch health + sessions (6.9s → 3s)
+        hs_result, sessions = await asyncio.gather(
+            self.health(url, token),
+            self.list_sessions(url, token),
+        )
+        hs = hs_result
         for agent_id in (hs.agents or []):
             agents_map[agent_id] = {"id": agent_id, "source": "health"}
-
-        # 2) Get agents from sessions
-        sessions = await self.list_sessions(url, token)
         session_list = sessions if isinstance(sessions, list) else []
         for sess in session_list:
             if not isinstance(sess, dict):
