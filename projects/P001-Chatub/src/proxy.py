@@ -3,6 +3,7 @@
 
 import http.server
 import json
+import socketserver
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -135,6 +136,33 @@ def init_db():
         theme TEXT DEFAULT 'dark',
         FOREIGN KEY (user_id) REFERENCES users(id)
     );
+    CREATE TABLE IF NOT EXISTS gateways (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        token TEXT DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        kind TEXT DEFAULT 'openclaw',
+        capabilities TEXT DEFAULT '{}'
+    );
+    CREATE TABLE IF NOT EXISTS chat_logs (
+        id TEXT PRIMARY KEY,
+        gateway_id TEXT DEFAULT '',
+        gateway_name TEXT DEFAULT '',
+        role TEXT DEFAULT '',
+        content TEXT DEFAULT '',
+        model TEXT DEFAULT '',
+        tokens_prompt INTEGER DEFAULT 0,
+        tokens_completion INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_bot ON messages(bot_id);
+    CREATE INDEX IF NOT EXISTS idx_threads_message ON threads(message_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id, status);
+    CREATE INDEX IF NOT EXISTS idx_chat_logs_gateway ON chat_logs(gateway_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_gateways_name ON gateways(name);
     """)
     conn.commit()
     conn.close()
@@ -338,6 +366,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     rid = path[len(prefix) + 1:]
                     if rid:
                         return handler(method, rid, qs)
+
+            # Gateways API
+            if path == '/api/gateways' and method == 'GET':
+                return self.h_gateways_list()
+            if path == '/api/gateways/register' and method == 'POST':
+                return self.h_gateways_register()
+            if path == '/api/gateways/auto-detect' and method == 'POST':
+                return self.h_gateways_auto_detect()
+            if path == '/api/gateways/chat-logs' and method == 'GET':
+                return self.h_gateways_chat_logs(qs)
+            if path == '/api/gateway-broadcast' and method == 'POST':
+                return self.h_gateway_broadcast()
+            if path.startswith('/api/gateways/'):
+                rid = path[len('/api/gateways/'):]
+                if rid:
+                    return self.h_gateways_detail(method, rid)
 
             self.json_err("찾을 수 없습니다", 404)
 
@@ -1017,6 +1061,173 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             db.close()
 
     # -----------------------------------------------------------------------
+    # Gateways API
+    # -----------------------------------------------------------------------
+
+    def h_gateways_list(self):
+        """List all registered gateways with live status."""
+        db = get_db()
+        try:
+            rows = db.execute("SELECT * FROM gateways ORDER BY name").fetchall()
+            result = []
+            for row in rows:
+                gw = dict(row)
+                gw['online'] = False
+                gw['status'] = 'disconnected'
+                gw['agents'] = []
+                gw['version'] = None
+                gw['pairing_status'] = 'disconnected'
+                # Live health check
+                gw['last_check'] = now_ts()
+                try:
+                    url = gw['url'].rstrip('/')
+                    token = gw.get('token', '')
+                    headers = {}
+                    if token:
+                        headers['Authorization'] = f'Bearer {token}'
+                    req = urllib.request.Request(f'{url}/api/v1/health', headers=headers, method='GET')
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        health = json.loads(resp.read())
+                        gw['online'] = True
+                        gw['status'] = 'online'
+                        gw['agents'] = health.get('agents', [])
+                        gw['version'] = health.get('version', None)
+                        gw['pairing_status'] = 'connected'
+                except Exception:
+                    pass
+                gw['updated_at'] = now_ts()
+                db.execute("UPDATE gateways SET updated_at=? WHERE id=?", (gw['updated_at'], gw['id']))
+                result.append(gw)
+            db.commit()
+            return self.json_ok(result)
+        finally:
+            db.close()
+
+    def h_gateways_register(self):
+        """Register a new gateway."""
+        uid = self.require_auth()
+        if not uid:
+            return
+        data = self.read_json()
+        name = (data.get('name') or '').strip()
+        url = (data.get('url') or '').strip()
+        token = (data.get('token') or '').strip()
+        kind = (data.get('kind') or 'openclaw').strip()
+        capabilities = (data.get('capabilities') or '{}').strip()
+        if not name or not url:
+            return self.json_err('name과 url이 필요합니다')
+        db = get_db()
+        try:
+            gid = new_id()
+            db.execute(
+                "INSERT INTO gateways (id, name, url, token, kind, capabilities, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                (gid, name, url, token, kind, capabilities, now_ts(), now_ts())
+            )
+            db.commit()
+            row = db.execute("SELECT * FROM gateways WHERE id=?", (gid,)).fetchone()
+            return self.json_ok(dict(row))
+        finally:
+            db.close()
+
+    def h_gateways_auto_detect(self):
+        """Auto-detect gateway at given URL."""
+        data = self.read_json()
+        url = (data.get('url') or '').strip()
+        if not url:
+            return self.json_err('url이 필요합니다')
+        result = {'url': url, 'online': False, 'version': None, 'agents': []}
+        try:
+            url = url.rstrip('/')
+            req = urllib.request.Request(f'{url}/api/v1/health', method='GET')
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                health = json.loads(resp.read())
+                result['online'] = True
+                result['version'] = health.get('version')
+                result['agents'] = health.get('agents', [])
+        except Exception:
+            pass
+        return self.json_ok(result)
+
+    def h_gateways_chat_logs(self, qs):
+        """Get chat logs filtered by gateway_id."""
+        gw_id = self.qs_get(qs, 'gateway_id')
+        limit = int(self.qs_get(qs, 'limit', '50'))
+        db = get_db()
+        try:
+            if gw_id:
+                rows = db.execute(
+                    "SELECT * FROM chat_logs WHERE gateway_id=? ORDER BY created_at DESC LIMIT ?",
+                    (gw_id, limit)
+                ).fetchall()
+            else:
+                rows = db.execute(
+                    "SELECT * FROM chat_logs ORDER BY created_at DESC LIMIT ?",
+                    (limit,)
+                ).fetchall()
+            return self.json_ok([dict(r) for r in rows])
+        finally:
+            db.close()
+
+    def h_gateway_broadcast(self):
+        """Broadcast message to all online gateways."""
+        data = self.read_json()
+        text = (data.get('text') or '').strip()
+        if not text:
+            return self.json_err('text가 필요합니다')
+        db = get_db()
+        try:
+            gateways = db.execute("SELECT * FROM gateways").fetchall()
+            results = []
+            for gw in gateways:
+                gw_dict = dict(gw)
+                url = gw_dict['url'].rstrip('/')
+                token = gw_dict.get('token', '')
+                status = 'error'
+                try:
+                    headers = {'Content-Type': 'application/json'}
+                    if token:
+                        headers['Authorization'] = f'Bearer {token}'
+                    payload = json.dumps({'message': text, 'stream': False}).encode()
+                    req = urllib.request.Request(f'{url}/api/v1/chat', data=payload, headers=headers, method='POST')
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        resp_data = json.loads(resp.read())
+                        # Log to chat_logs
+                        db.execute(
+                            "INSERT INTO chat_logs (id, gateway_id, gateway_name, role, content, created_at) VALUES (?,?,?,?,?,?)",
+                            (new_id(), gw_dict['id'], gw_dict['name'], 'user', text, now_ts())
+                        )
+                        if 'response' in resp_data:
+                            db.execute(
+                                "INSERT INTO chat_logs (id, gateway_id, gateway_name, role, content, created_at) VALUES (?,?,?,?,?,?)",
+                                (new_id(), gw_dict['id'], gw_dict['name'], 'assistant', resp_data['response'], now_ts())
+                            )
+                        status = 'ok'
+                except Exception as e:
+                    status = f'error: {str(e)[:100]}'
+                results.append({'name': gw_dict['name'], 'status': status})
+            db.commit()
+            return self.json_ok({'sent': len(results), 'results': results})
+        finally:
+            db.close()
+
+    def h_gateways_detail(self, method, rid):
+        """Get or delete a single gateway by ID."""
+        db = get_db()
+        try:
+            if method == 'GET':
+                row = db.execute("SELECT * FROM gateways WHERE id=?", (rid,)).fetchone()
+                if not row:
+                    return self.json_err('찾을 수 없습니다', 404)
+                return self.json_ok(dict(row))
+            if method == 'DELETE':
+                db.execute("DELETE FROM gateways WHERE id=?", (rid,))
+                db.commit()
+                return self.json_ok()
+            self.json_err('허용되지 않는 메서드', 405)
+        finally:
+            db.close()
+
+    # -----------------------------------------------------------------------
     # Migration (localStorage -> DB)
     # -----------------------------------------------------------------------
 
@@ -1190,7 +1401,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 # Server
 # ---------------------------------------------------------------------------
 
-class ReuseServer(http.server.HTTPServer):
+class ReuseServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
     allow_reuse_address = True
 
 
