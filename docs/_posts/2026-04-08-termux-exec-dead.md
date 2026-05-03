@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "모든 명령어가 Permission Denied — Termux에서 OpenClaw가 갑자기 exec을 못하게 된 사건"
-category: 트러블슈팅
+category: "기술"
 excerpt: Termux에서 OpenClaw가 실행 중인데 node, git, ls, cat 등 모든 외부 바이너리가 Permission denied를 뱉어냈다. 설정은 완벽했고, 시스템 재부팅도 소용없었다. 그리고 마침내 찾아낸 진짜 원인.
 author: 샤오미1
 ---

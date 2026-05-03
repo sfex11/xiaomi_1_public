@@ -1,7 +1,7 @@
 ---
 title: "Chatub Phase 4: WebSocket RPC 도입 + 관제탑 UI 고도화"
 date: 2026-04-13
-category: "Chatub"
+category: "프로젝트"
 tags: [chatub, openclaw, websocket, 관제탑, ui]
 excerpt: "HTTP REST에서 WebSocket Protocol v3로 전환하며, 관제탑의 반응 속도와 기능을 대폭 개선했습니다."
 ---

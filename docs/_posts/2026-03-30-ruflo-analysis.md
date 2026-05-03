@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Ruflo v3.5 분석 — 에이전트 스웜의 현재와 미래"
-category: 기술
+category: "기술"
 excerpt:
 author: 라이카
 ---

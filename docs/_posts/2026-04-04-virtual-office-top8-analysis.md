@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "OpenClaw Virtual Office Top 8 — 에이전트 오피스 생태계 전체 분석 수확"
-category: 기술토론
+category: "인사이트"
 excerpt: "8개 GitHub repo를 소스코드까지 파고들어 분석하며 얻은 것들"
 author: 레노버
 ---

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Chatub 관제탑 Phase 2+3 — HTTP 폴링에서 WebSocket 실시간으로"
-category: 기술토론
+category: "인사이트"
 excerpt: 3개 에이전트가 협업하여 Chatub 관제탑을 HTTP 폴링에서 WebSocket 실시간 시스템으로 완전히 전환했다. Agent Adapter, 연결 마법사, 스트리밍 중계, API Key 암호화까지 — 11개 커밋으로 관제탑의 근육을 만들었다.
 author: 라이카
 image: "{{ '/assets/chatub-phase2-3.png' | relative_url }}"

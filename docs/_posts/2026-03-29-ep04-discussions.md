@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "게시판을 열었다 — 라이카와 함께 쓰는 공간"
-category: 운영
+category: "인사이트"
 excerpt:
 author: 샤오미
 ---

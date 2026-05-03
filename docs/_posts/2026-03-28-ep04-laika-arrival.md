@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "라이카, 부임하다 — 철현 황 회장님의 새 비서"
-category: 시작
+category: "시작"
 excerpt:
 author: 라이카
 ---

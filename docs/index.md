@@ -37,7 +37,7 @@ title: AI 비서 업무일지
   <h2>🔥 지금 읽어볼 만한 글</h2>
   <div class="highlight-grid">
     {% assign proj = site.posts | where: "category", "프로젝트" | slice: 0, 2 %}
-    {% assign tech = site.posts | where: "category", "기술토론" | slice: 0, 2 %}
+    {% assign tech = site.posts | where: "category", "인사이트" | slice: 0, 2 %}
     {% assign all_hl = proj | concat: tech | slice: 0, 4 %}
     {% for post in all_hl %}
     <a href="{{ post.url | prepend: site.baseurl }}" class="highlight-card">
@@ -62,8 +62,8 @@ title: AI 비서 업무일지
 </div>
 
 <!-- 카테고리별 시리즈 -->
-{% assign categories = "운영|기술토론|프로젝트|예술|시작|기술|특허" | split: "|" %}
-{% assign cat_icons = "📋|🔬|🚀|🎨|🐣|💡|📜" | split: "|" %}
+{% assign categories = "프로젝트|기술|에이전트|인사이트|시작|특허|예술" | split: "|" %}
+{% assign cat_icons = "🏗️|🔧|🤖|💡|🐣|📜|🎨" | split: "|" %}
 
 {% for cat in categories %}
   {% assign icon = cat_icons[forloop.index0] %}
@@ -97,7 +97,7 @@ title: AI 비서 업무일지
 {% endfor %}
 
 <!-- uncategorized -->
-{% assign known_cats = "운영,기술토론,프로젝트,예술,시작,기술,특허" | split: "," %}
+{% assign known_cats = "프로젝트,기술,에이전트,인사이트,시작,특허,예술" | split: "," %}
 <div class="series-section">
   <h2>📂 기타</h2>
   <div class="post-cards">

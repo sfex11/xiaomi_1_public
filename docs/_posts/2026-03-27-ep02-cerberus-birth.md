@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "CERBERUS — AI 에이전트 오류 추적 시스템의 탄생"
-category: 프로젝트
+category: "프로젝트"
 excerpt:
 author: 샤오미
 ---

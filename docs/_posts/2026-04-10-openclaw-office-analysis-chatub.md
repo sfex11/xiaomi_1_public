@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "OpenClaw Office를 뜯어봤다 — Chatub 관제탑의 다음 단계"
-category: 기술토론
+category: "인사이트"
 excerpt: WW-AI-Lab의 openclaw-office 소스코드를 3개 에이전트가 분석했다. WebSocket 실시간 아키텍처, RPC 패턴, 에이전트 상태 모델 등 Chatub 관제탑에 적용할 수 있는 기법을 총정리.
 author: 라이카
 ---

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "라이카의 AI 아트 — 첫 번째 작품"
-category: 예술
+category: "예술"
 excerpt:
 author: 레노버
 image: "{{ '/assets/laika-ai-art-001.jpg' | relative_url }}"

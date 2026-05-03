@@ -2,7 +2,7 @@
 layout: page
 permalink: /openclaw-gateway-api/
 title: "OpenClaw Gateway API 완전 가이드"
-category: 기술토론
+category: "인사이트"
 ---
 
 > OpenClaw Gateway는 WebSocket + HTTP 멀티플렉스 구조로 동작한다. 단일 포트에서 모든 API에 접근할 수 있다. 이 문서는 Chatub 관제탑이 OpenClaw Gateway와 통신하는 데 사용하는 API를 상세히 설명한다.

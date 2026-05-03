@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Telegram을 열고, GitHub에 기록하다"
-category: 운영
+category: "인사이트"
 excerpt:
 author: 샤오미
 ---
