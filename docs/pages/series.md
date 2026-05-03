@@ -6,52 +6,44 @@ permalink: /series/
 
 ## 시리즈별 포스트 모음
 
-### 🏗️ P001 Chatub — 에이전트 관제탑
-{% assign chatub = site.posts | where: "category", "프로젝트" | sort: "date" %}
-{% for post in chatub %}
-{% if post.title contains "Chatub" or post.title contains "P001" or post.title contains "chatub" %}
-- [{{ post.date | date: "%Y.%m.%d" }}] {{ post.title }} — *{{ post.excerpt }}*
-{% endif %}
+### 🏗️ 프로젝트
+{% assign proj = site.posts | where: "category", "프로젝트" | sort: "date" | reverse %}
+{% for post in proj %}
+- [{{ post.date | date: "%Y.%m.%d" }}] [{{ post.title }}]({{ post.url | prepend: site.baseurl }}) — *{{ post.excerpt }}*
 {% endfor %}
 
-### 🤖 에이전트 연구
-{% assign agents = site.posts | where: "category", "에이전트" | sort: "date" %}
+### 🤖 에이전트
+{% assign agents = site.posts | where: "category", "에이전트" | sort: "date" | reverse %}
 {% for post in agents %}
-- [{{ post.date | date: "%Y.%m.%d" }}] {{ post.title }}
-{% endif %}
+- [{{ post.date | date: "%Y.%m.%d" }}] [{{ post.title }}]({{ post.url | prepend: site.baseurl }})
 {% endfor %}
 
 ### 🔧 기술
-{% assign tech = site.posts | where: "category", "기술" | sort: "date" %}
+{% assign tech = site.posts | where: "category", "기술" | sort: "date" | reverse %}
 {% for post in tech %}
-- [{{ post.date | date: "%Y.%m.%d" }}] {{ post.title }}
-{% endif %}
+- [{{ post.date | date: "%Y.%m.%d" }}] [{{ post.title }}]({{ post.url | prepend: site.baseurl }})
 {% endfor %}
 
 ### 💡 인사이트
-{% assign insight = site.posts | where: "category", "인사이트" | sort: "date" %}
+{% assign insight = site.posts | where: "category", "인사이트" | sort: "date" | reverse %}
 {% for post in insight %}
-- [{{ post.date | date: "%Y.%m.%d" }}] {{ post.title }}
-{% endif %}
+- [{{ post.date | date: "%Y.%m.%d" }}] [{{ post.title }}]({{ post.url | prepend: site.baseurl }})
 {% endfor %}
 
-### 📌 시작하기
-{% assign start = site.posts | where: "category", "시작" | sort: "date" %}
+### 📌 시작
+{% assign start = site.posts | where: "category", "시작" | sort: "date" | reverse %}
 {% for post in start %}
-- [{{ post.date | date: "%Y.%m.%d" }}] {{ post.title }}
-{% endif %}
+- [{{ post.date | date: "%Y.%m.%d" }}] [{{ post.title }}]({{ post.url | prepend: site.baseurl }})
 {% endfor %}
 
 ### 🔐 특허
-{% assign patent = site.posts | where: "category", "특허" | sort: "date" %}
+{% assign patent = site.posts | where: "category", "특허" | sort: "date" | reverse %}
 {% for post in patent %}
-- [{{ post.date | date: "%Y.%m.%d" }}] {{ post.title }}
-{% endif %}
+- [{{ post.date | date: "%Y.%m.%d" }}] [{{ post.title }}]({{ post.url | prepend: site.baseurl }})
 {% endfor %}
 
 ### 🎨 예술
-{% assign art = site.posts | where: "category", "예술" | sort: "date" %}
+{% assign art = site.posts | where: "category", "예술" | sort: "date" | reverse %}
 {% for post in art %}
-- [{{ post.date | date: "%Y.%m.%d" }}] {{ post.title }}
-{% endif %}
+- [{{ post.date | date: "%Y.%m.%d" }}] [{{ post.title }}]({{ post.url | prepend: site.baseurl }})
 {% endfor %}
